@@ -2,12 +2,12 @@
 
 This is how to publish a Python package to [**PyPI**](https://pypi.org/) from GitHub
 Actions, when using the
-[**simple-modern-uv**](https://github.com/jlevy/simple-modern-uv) template.
+[**python-template**](https://github.com/MFDI-hub/python-template) template.
 
 Thanks to
 [the dynamic versioning plugin](https://github.com/ninoseki/uv-dynamic-versioning/) and
 the [`publish.yml`
-workflow](https://github.com/jlevy/simple-modern-uv/blob/main/template/.github/workflows/publish.yml),
+workflow](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/publish.yml),
 you can simply create tagged releases (using standard format for the tag name, e.g.
 `v0.1.0`) on GitHub and the tag will trigger a release build, which then uploads it to
 PyPI.
@@ -19,12 +19,11 @@ Here is the simplest way to do it.
 For the purposes of this example replace OWNER and PROJECT with the right values.
 
 **Note:** These steps assume you already have a GitHub repo with your code pushed. If
-you used [`uvx uvtemplate`](https://github.com/jlevy/uvtemplate), it handles repo
-creation for you. If you're setting up manually, create an **empty** GitHub repo (no
+you're setting up manually, create an **empty** GitHub repo (no
 README, no .gitignore, no license — the template already provides these) and push your
 code to it. See the
-[README](https://github.com/jlevy/simple-modern-uv#option-2-use-copier-and-git-yourself)
-for details.
+[python-template README](https://github.com/MFDI-hub/python-template)
+for Copier usage and repo layout.
 
 1. **Get a PyPI account** at [pypi.org](https://pypi.org/) and sign in.
 
@@ -210,4 +209,4 @@ Guidelines:
 * * *
 
 *This file was built with
-[simple-modern-uv](https://github.com/jlevy/simple-modern-uv).*
+[python-template](https://github.com/MFDI-hub/python-template).*

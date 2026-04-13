@@ -1,18 +1,17 @@
 # Updating This Template
 
 This doc covers the full cycle for keeping the
-[simple-modern-uv](https://github.com/jlevy/simple-modern-uv) template's dependencies
+[python-template](https://github.com/MFDI-hub/python-template) template's dependencies
 and tools up to date, then verifying the changes end-to-end.
 
 There are two repos involved:
 
-- **Template repo** (`jlevy/simple-modern-uv`): The Copier template source. All version
+- **Template repo** (`MFDI-hub/python-template`): The Copier template source. All version
   changes start here. This repo does not have CI, so testing is done via a downstream
   project.
-- **Downstream project(s)**: Projects created from the template (e.g.
-  [`jlevy/simple-modern-uv-template`](https://github.com/jlevy/simple-modern-uv-template)).
-  These pull updates via `copier update` and have CI configured to run linting and tests
-  across the Python version matrix.
+- **Downstream project(s)**: Projects created from the template (your libraries or apps on
+  GitHub under `MFDI-hub` or elsewhere). These pull updates via `copier update` and have CI
+  configured to run linting and tests across the Python version matrix.
 
 ## Step 1: Check Latest Versions
 
@@ -59,7 +58,7 @@ git push origin main --tags
 
 ## Step 4: Update a Downstream Project
 
-In a downstream project (e.g. `simple-modern-uv-template`), pull the template update.
+In a downstream project (e.g. `my-package`), pull the template update.
 The working tree must be clean before running `copier update`:
 
 ```shell
@@ -91,7 +90,7 @@ Commit and push the downstream project:
 
 ```shell
 git add -A
-git commit -m "Update from simple-modern-uv template vX.Y.Z."
+git commit -m "Update from MFDI-hub/python-template vX.Y.Z."
 git push origin main
 ```
 
@@ -115,7 +114,7 @@ gh release create v0.X.Y --title "v0.X.Y" --notes "$(cat <<'EOF'
 - **Updated uv** to X.Y.Z in CI workflows
 - Any other changes
 
-**Full Changelog**: https://github.com/jlevy/simple-modern-uv/compare/vPREVIOUS...v0.X.Y
+**Full Changelog**: https://github.com/MFDI-hub/python-template/compare/vPREVIOUS...v0.X.Y
 EOF
 )"
 ```

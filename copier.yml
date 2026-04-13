@@ -15,7 +15,7 @@ _message_after_copy: |
     git init
     # Make license or other initial adjustments if needed.
     git add .
-    git commit -m "Initial commit from simple-modern-uv."
+    git commit -m "Initial commit from MFDI-hub/python-template."
     # Create repo on GitHub.
     git remote add origin git@github.com:OWNER/PROJECT.git  # or https://...
     git branch -M main
