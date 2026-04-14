@@ -1,27 +1,46 @@
 ## Installing uv and Python
 
-This project is set up to use [**uv**](https://docs.astral.sh/uv/), the new package
-manager for Python. `uv` replaces traditional use of `pyenv`, `pipx`, `poetry`, `pip`,
-etc. This is a quick cheat sheet on that:
+This project is set up to use [**uv**](https://docs.astral.sh/uv/) for Python and
+dependency management.
 
-On macOS or Linux, if you don't have `uv` installed, a quick way to install it:
+### Install uv
+
+On macOS or Linux:
 
 ```shell
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-For macOS, you prefer [brew](https://brew.sh/) you can install or upgrade uv with:
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+If you use Homebrew (macOS):
 
 ```shell
 brew update
 brew install uv
 ```
 
-See [uv's docs](https://docs.astral.sh/uv/getting-started/installation/) for more
-installation methods and platforms.
+See [uv's docs](https://docs.astral.sh/uv/getting-started/installation/) for all
+supported installation methods.
 
-Now you can use uv to install a current Python environment:
+### Install Python with uv
 
 ```shell
-uv python install 3.13 # Or pick another version.
+uv python install 3.13
 ```
+
+You can choose any compatible version required by this project.
+
+### Install project dependencies
+
+From your project root:
+
+```shell
+uv sync --all-extras
+```
+
+This creates `.venv` and installs runtime + development dependencies.

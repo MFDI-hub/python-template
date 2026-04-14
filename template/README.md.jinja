@@ -16,6 +16,20 @@ For development workflows, see [development.md](docs/development.md).
 
 For instructions on publishing to PyPI, see [publishing.md](docs/publishing.md).
 
+## Quickstart
+
+```shell
+# Install project dependencies:
+uv sync --all-extras
+
+# Run quality checks:
+uv run python devtools/lint.py
+uv run pytest
+
+# Build package artifacts:
+uv build
+```
+
 * * *
 
 *This project was built from

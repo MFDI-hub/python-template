@@ -12,6 +12,7 @@ _message_after_copy: |
     Next steps:
     
     cd PROJECT
+    uv sync --all-extras
     git init
     # Make license or other initial adjustments if needed.
     git add .

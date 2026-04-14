@@ -67,6 +67,8 @@ git stash --include-untracked  # if needed
 
 # Pull template changes:
 copier update --defaults
+# Or, without globally installing Copier:
+uvx copier update --defaults
 
 # Restore stash if needed:
 git stash pop
