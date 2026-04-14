@@ -1,2 +1,18 @@
+[project]
+name = "python-template"
+version = "0.1.0"
+description = "A Copier template for Python libraries/projects."
+requires-python = ">=3.11"
+
+[dependency-groups]
+dev = [
+    "copier>=9.4.0",
+    "ruff>=0.15.1",
+    "funlog>=0.2.1",
+    "rich>=14.3.2"
+]
+
+
+
 [tool.ruff]
 line-length = 100
