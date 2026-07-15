@@ -59,8 +59,28 @@ jobs:
       - name: Run linting
         run: uv run python devtools/lint.py
 
-      - name: Run tests
-        run: uv run pytest
+      - name: Run tests with coverage
+        run: >
+          uv run pytest -n auto
+          --cov
+          --cov-report=term-missing
+          --cov-report=xml
 
       - name: Verify Docs Build
         run: uv run mkdocs build --strict
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run Trivy vulnerability scanner
+        # Pin to commit SHA (v0.36.0) — prefer SHA over mutable tags for Actions.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true

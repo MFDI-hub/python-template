@@ -19,12 +19,13 @@ For instructions on publishing to PyPI, see [publishing.md](docs/publishing.md).
 ## Quickstart
 
 ```shell
-# Install project dependencies:
-uv sync --all-extras
+# Install project dependencies + git hooks:
+make install
+# or: uv sync --all-extras && uv run pre-commit install
 
 # Run quality checks:
 uv run python devtools/lint.py
-uv run pytest
+uv run pytest -n auto --cov --cov-report=term-missing
 
 # Build package artifacts:
 uv build

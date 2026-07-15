@@ -5,12 +5,17 @@ Actions, when using the
 [**python-template**](https://github.com/MFDI-hub/python-template) template.
 
 Thanks to
-[the dynamic versioning plugin](https://github.com/ninoseki/uv-dynamic-versioning/) and
-the [`publish.yml`
-workflow](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/publish.yml),
-you can simply create tagged releases (using standard format for the tag name, e.g.
-`v0.1.0`) on GitHub and the tag will trigger a release build, which then uploads it to
-PyPI.
+[the dynamic versioning plugin](https://github.com/ninoseki/uv-dynamic-versioning/),
+the [`release.yml`](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/release.yml)
+workflow (semantic-release), and the [`publish.yml`](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/publish.yml)
+workflow, tagged GitHub Releases publish the matching version to PyPI.
+
+You can release in either way:
+
+1. **Automatic (recommended):** push Conventional Commits to `main`/`master`. The
+   semantic-release workflow creates a GitHub Release + `vX.Y.Z` tag when commits warrant
+   a bump. That release triggers `publish.yml`.
+2. **Manual:** create a tagged release yourself in the GitHub UI or with `gh` (below).
 
 ### First-Time Setup
 
@@ -44,23 +49,18 @@ for Copier usage and repo layout.
    - Enter the project name, repo owner, repo name, and `publish.yml` as the workflow
      name. (You can leave the “environment name” field blank.)
 
-4. **Create a release** on GitHub:
+4. **Create a first release** so versioning starts on `0.x` (optional but recommended):
 
-   - Commit code and make sure it’s running correctly.
+   semantic-release’s first release is `1.0.0` if no tags exist. To stay on `0.x`, create
+   an initial tag once after setup:
 
-   - Go to your GitHub project page, then click on Actions tab.
+   ```shell
+   git tag v0.1.0
+   git push origin v0.1.0
+   gh release create v0.1.0 --generate-notes
+   ```
 
-   - Confirm all tests are passing in the last CI workflow.
-     (If you want, you can even publish this template when it’s empty as just a stub
-     project, to try all this out.)
-
-   - Go to your GitHub project page, click on Releases.
-
-   - Fill in the tag and the release name.
-     Select to create a new tag, and pick a version.
-     A good option is `v0.1.0`. (It’s wise to have it start with a `v`.)
-
-   - Submit to create the release.
+   Later bumps follow Conventional Commits automatically.
 
 5. **Confirm it publishes to PyPI**
 
@@ -96,39 +96,25 @@ Follow this checklist for each new release.
 
    Or check the Actions tab on GitHub.
 
-4. **Determine the new version number:**
+4. **Determine the new version number** (manual releases only):
 
    ```shell
    # Check current/latest version:
    gh release list --limit 1
    ```
 
-   Use [semantic versioning](https://semver.org/):
+   Use [semantic versioning](https://semver.org/) / Conventional Commits:
 
-   - **Patch** (e.g., `v0.5.8` → `v0.5.9`): Bug fixes, minor changes
-
-   - **Minor** (e.g., `v0.5.9` → `v0.6.0`): New features, backward-compatible
-
-   - **Major** (e.g., `v0.6.0` → `v1.0.0`): Breaking changes
+   - **fix:** → patch (e.g. `v0.5.8` → `v0.5.9`)
+   - **feat:** → minor (e.g. `v0.5.9` → `v0.6.0`)
+   - **BREAKING CHANGE** / `!` → major (e.g. `v0.6.0` → `v1.0.0`)
 
 #### Create the Release
 
-5. **Generate release notes content:**
+5. **Automatic:** merge Conventional Commits to `main` and let `release.yml` create the
+   GitHub Release.
 
-   Review changes since the last release:
-
-   ```shell
-   # Get the last release tag:
-   LAST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
-   
-   # View commits since last release:
-   git log ${LAST_TAG}..HEAD --oneline
-   
-   # View full diff:
-   git diff ${LAST_TAG}..HEAD
-   ```
-
-6. **Create the release with `gh`:**
+6. **Manual — create the release with `gh`:**
 
    ```shell
    NEW_TAG="vX.Y.Z"  # Replace with actual version
@@ -163,7 +149,7 @@ Follow this checklist for each new release.
 
 ### Release Notes Format
 
-Use this structure for release notes:
+Use this structure for release notes (manual releases):
 
 ```markdown
 ## What's Changed

@@ -32,7 +32,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -n auto --cov --cov-report=term-missing
 
       - name: Build package
         run: uv build

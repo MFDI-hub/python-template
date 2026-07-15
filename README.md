@@ -19,9 +19,9 @@ cd my-package
 ### 3) Start developing
 
 ```shell
-uv sync --all-extras
-uv run pytest
-uv run python devtools/lint.py
+make install   # uv sync + pre-commit install
+make lint
+make test
 ```
 
 ## Updating an existing project from the template
@@ -34,6 +34,8 @@ uvx copier update
 
 ## Scaffolded project includes
 
+### Core
+
 - **uv** - env, sync, run, build, publish
 - **Copier** - generate/update from this template
 - **Hatchling** + **uv-dynamic-versioning** - build, version from git tags
@@ -43,5 +45,30 @@ uvx copier update
 - **codespell** - spelling (via `devtools/lint.py`)
 - **MkDocs** + **Material for MkDocs** - docs (`mkdocs serve` / `build`)
 - **rich** + **funlog** - devtools lint script output
-- **Makefile** - `install`, `lint`, `test`, `docs`, `docs-build`, `build`, `clean`, `upgrade`
-- **GitHub Actions** - CI (lint, pytest, strict docs build) and publish workflow for PyPI (OIDC)
+- **Makefile** - `install`, `lint`, `test`, `docs`, `docs-build`, `build`, `clean`, `upgrade`, `pre-commit`
+- **GitHub Actions** - CI (lint, pytest+coverage, docs, Trivy) and PyPI publish (OIDC)
+
+### Quality & testing
+
+- **pre-commit** - git hooks (ruff, codespell, ty, vulture)
+- **pytest-cov** - coverage reports in local/`make test` and CI
+- **pytest-xdist** - parallel tests (`-n auto`)
+- **vulture** - dead code detection
+- **commitizen** - Conventional Commits (`cz commit`)
+
+### Security & deps
+
+- **Dependabot** - weekly updates for Actions + Python deps
+- **Trivy** - filesystem vulnerability scan in CI
+
+### Release & docs hosting
+
+- **semantic-release** - auto GitHub Releases from Conventional Commits (`.releaserc.yml` + `release.yml`)
+- **Read the Docs** - `.readthedocs.yaml` + `docs/requirements-rtd.txt`
+
+### DevEx
+
+- **devcontainer.json** - Codespaces / VS Code Dev Containers
+- **VS Code Tasks** - install, lint, test, docs, build
+- **Optional extras** - `structlog` + `tqdm` via `uv sync --extra observability`
+- Documented: **act** (local Actions), **httpie** (`uvx httpie`), GitHub milestones/projects

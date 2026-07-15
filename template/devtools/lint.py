@@ -20,6 +20,7 @@ def main():
     errcount += run(["ruff", "check", "--fix", *SRC_PATHS])
     errcount += run(["ruff", "format", *SRC_PATHS])
     errcount += run(["ty", "check", *SRC_PATHS])
+    errcount += run(["vulture", *SRC_PATHS])
 
     rprint()
 

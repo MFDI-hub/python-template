@@ -43,12 +43,23 @@ dependencies = [
 ]
 
 
+# ---- Optional runtime extras ----
+
+[project.optional-dependencies]
+observability = [
+    "structlog>=25.1.0",
+    "tqdm>=4.67.1",
+]
+
+
 # ---- Dev dependencies ----
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "pytest-sugar>=1.1.1",
+    "pytest-cov>=6.1.1",
+    "pytest-xdist>=3.6.1",
     "ruff>=0.15.1",
     "codespell>=2.4.1",
     "rich>=14.3.2",
@@ -56,6 +67,9 @@ dev = [
     "funlog>=0.2.1",
     "mkdocs",
     "mkdocs-material",
+    "pre-commit>=4.2.0",
+    "commitizen>=4.8.3",
+    "vulture>=2.14",
 ]
 
 [project.scripts]
@@ -147,3 +161,29 @@ testpaths = [
 ]
 norecursedirs = []
 filterwarnings = []
+addopts = [
+    "-ra",
+    "--strict-markers",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+# Raise this as the project grows (placeholder tests start near 0%):
+# fail_under = 80
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_provider = "scm"
+update_changelog_on_bump = true
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src", "tests", "devtools"]
+ignore_names = ["main"]
+# exclude = ["*/migrations/*"]

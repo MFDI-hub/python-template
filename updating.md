@@ -19,7 +19,8 @@ From the template repo, check what's current on PyPI:
 
 ```shell
 # Check latest versions of each dev dependency:
-for pkg in ruff ty pytest pytest-sugar codespell rich funlog mkdocs mkdocs-material; do
+for pkg in ruff ty pytest pytest-sugar pytest-cov pytest-xdist codespell rich funlog \
+  mkdocs mkdocs-material pre-commit commitizen vulture structlog tqdm; do
   echo "$pkg: $(curl -s https://pypi.org/pypi/$pkg/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])")"
 done
 
@@ -30,8 +31,14 @@ curl -s https://pypi.org/pypi/uv/json | python3 -c "import sys,json; print('uv:'
 Also check for new major versions of GitHub Actions:
 - `actions/checkout` — <https://github.com/actions/checkout/releases>
 - `astral-sh/setup-uv` — <https://github.com/astral-sh/setup-uv/releases>
+- `actions/setup-node` — <https://github.com/actions/setup-node/releases>
+- `cycjimmy/semantic-release-action` — <https://github.com/cycjimmy/semantic-release-action/releases>
+- `aquasecurity/trivy-action` — <https://github.com/aquasecurity/trivy-action/releases>
 
 And check if new Python versions should be added to the test matrix.
+
+Also bump pinned hook `rev:` values in `template/.pre-commit-config.yaml` when updating
+ruff/codespell.
 
 ## Step 2: Update the Template Files
 
@@ -80,8 +87,9 @@ After the copier update, confirm everything works locally:
 
 ```shell
 uv sync --upgrade
+uv run pre-commit install
 uv run python devtools/lint.py
-uv run pytest
+uv run pytest -n auto --cov --cov-report=term-missing
 uv run mkdocs build --strict
 uv build
 ```
