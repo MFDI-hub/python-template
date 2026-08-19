@@ -17,11 +17,17 @@ repos:
       - id: codespell
         exclude: ^(uv\.lock|\.git/)
 
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.8.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
   - repo: local
     hooks:
       - id: ty
         name: ty type check
-        entry: uv run ty check src tests devtools
+        entry: uv run ty check src tests devtools scripts
         language: system
         pass_filenames: false
         types: [python]

@@ -67,6 +67,7 @@ dev = [
     "funlog>=0.2.1",
     "mkdocs",
     "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
     "pre-commit>=4.2.0",
     "commitizen>=4.8.3",
     "vulture>=2.14",
@@ -75,6 +76,9 @@ dev = [
 [project.scripts]
 # Add script entry points here:
 {{ package_name }} = "{{ package_module }}:main"
+
+[tool.uv.scripts]
+sync-chosen-files = "python scripts/sync_chosen_files.py"
 
 
 # ---- Build system ----
@@ -181,9 +185,10 @@ name = "cz_conventional_commits"
 tag_format = "v$version"
 version_provider = "scm"
 update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
 
 [tool.vulture]
 min_confidence = 80
-paths = ["src", "tests", "devtools"]
+paths = ["src", "tests", "devtools", "scripts"]
 ignore_names = ["main"]
 # exclude = ["*/migrations/*"]

@@ -35,7 +35,7 @@ for Copier usage and repo layout.
 2. **Pick a name for the project** that isn’t already taken.
 
    - Go to `https://pypi.org/project/PROJECT` to see if another project with that name
-     already exits.
+     already exists.
 
    - If needed, update your `pyproject.toml` with the correct name.
 

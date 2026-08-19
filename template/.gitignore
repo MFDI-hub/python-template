@@ -5,6 +5,7 @@ tmp/
 trash/
 attic/
 .kash/
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
