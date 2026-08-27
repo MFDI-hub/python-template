@@ -74,8 +74,9 @@ dev = [
 ]
 
 [project.scripts]
-# Add script entry points here:
-{{ package_name }} = "{{ package_module }}:main"
+# Use the module name (snake_case). Hyphens in package_name can break the
+# console script on Windows.
+{{ package_module }} = "{{ package_module }}:main"
 
 [tool.uv.scripts]
 sync-chosen-files = "python scripts/sync_chosen_files.py"

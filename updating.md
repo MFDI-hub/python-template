@@ -47,7 +47,9 @@ In the template repo, update these files as needed:
 - **Dev dependency version pins** in `template/pyproject.toml.jinja`
 - **uv version** in `template/.github/workflows/ci.yml` and `publish.yml`
   (the `version:` field under `astral-sh/setup-uv`)
-- **GitHub Actions versions** (e.g. `actions/checkout@v6`) in the same workflow files
+- **GitHub Actions versions** (e.g. `actions/checkout@v7`) in the same workflow files.
+  Pin `astral-sh/setup-uv` to a full version (e.g. `v10.0.1`); from v8 onward,
+  major tags like `@v10` do not resolve.
 - **Python version matrix** in `template/.github/workflows/ci.yml` and the
   corresponding classifiers in `template/pyproject.toml.jinja`
 

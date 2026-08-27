@@ -11,10 +11,20 @@ Then run Copier through `uvx` (no global install required).
 
 ### 2) Generate a project
 
+Into a new folder:
+
 ```shell
 uvx copier copy https://github.com/MFDI-hub/python-template my-package
 cd my-package
 ```
+
+Into the current folder (an empty git repo you already created on GitHub, for example):
+
+```shell
+uvx copier copy https://github.com/MFDI-hub/python-template .
+```
+
+Copier will prompt if a file already exists (`.gitignore` is a common conflict). Answer `Yes` to overwrite, or `No` to keep what is there. Do not run this inside the `python-template` source repo itself.
 
 ### 3) Start developing
 

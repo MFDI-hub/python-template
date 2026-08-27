@@ -7,11 +7,11 @@ _message_after_copy: |
 
     Remember to look for any unfilled `changeme` strings and confirm the license!
     By default this template uses MIT license.
-    See `license` in pyproject.yaml and update the LICENSE file. 
+    See `license` in pyproject.toml and update the LICENSE file. 
 
     Next steps:
     
-    cd PROJECT
+    cd PROJECT  # skip if you copied into `.`
     make install
     git init
     # Make license or other initial adjustments if needed.
@@ -31,7 +31,8 @@ package_name:
 package_module:
     type: str
     help: Package module name? (This is the Python module, so use snake_case. Or press enter to fill in later.)
-    default: changeme
+    default: "{{ package_name.replace('-', '_').replace('.', '_') }}"
+    validator: "{% if not package_module.isidentifier() %}Must be a valid Python identifier (snake_case, no hyphens).{% endif %}"
 
 package_description:
     type: str
@@ -52,3 +53,8 @@ package_github_org:
     type: str
     help: Package GitHub org or username? (Press enter to fill in later.)
     default: changeme
+
+copyright_year:
+    type: str
+    help: Copyright year for LICENSE?
+    default: "2026"

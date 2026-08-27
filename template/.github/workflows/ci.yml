@@ -31,13 +31,13 @@ jobs:
       # https://docs.astral.sh/uv/guides/integration/github/
 
       - name: Checkout (official GitHub action)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Important for versioning plugins:
           fetch-depth: 0
 
       - name: Install uv (official Astral action)
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           # Update this as needed:
           version: "0.10.2"
@@ -49,7 +49,7 @@ jobs:
 
       # Alternately can use the official Python action:
       # - name: Set up Python (using actions/setup-python)
-      #   uses: actions/setup-python@v5
+      #   uses: actions/setup-python@v6
       #   with:
       #     python-version: ${{ matrix.python-version }}
 
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Run Trivy vulnerability scanner
         # Pin to commit SHA (v0.36.0) — prefer SHA over mutable tags for Actions.
@@ -89,10 +89,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           version: "0.10.2"
           enable-cache: true
