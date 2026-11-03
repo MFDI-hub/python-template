@@ -5,29 +5,31 @@
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.1
+    rev: v0.17.3
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         exclude: ^(uv\.lock|\.git/)
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.8.3
+    rev: v4.19.3
     hooks:
       - id: commitizen
         stages: [commit-msg]
 
   - repo: local
     hooks:
+      # These read their paths from pyproject.toml, so no file list is passed:
+      # a hardcoded list silently drifts from [tool.ty.src] / [tool.vulture].
       - id: ty
         name: ty type check
-        entry: uv run ty check src tests devtools scripts
+        entry: uv run ty check
         language: system
         pass_filenames: false
         types: [python]
@@ -35,6 +37,15 @@ repos:
       - id: vulture
         name: vulture dead code
         entry: uv run vulture
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      # Runs on every commit but only fails when a *source* import changed the
+      # picture; it needs the env, hence language: system + uv run.
+      - id: deptry
+        name: deptry dependency check
+        entry: uv run deptry .
         language: system
         pass_filenames: false
         types: [python]

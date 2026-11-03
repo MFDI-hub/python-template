@@ -231,8 +231,19 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
     if project["scripts"].get(module) != f"{module}:main":
         raise CheckFailed(f"console script for {module} is wrong: {project['scripts']}")
 
-    dev = [d.lower() for d in data["dependency-groups"]["dev"]]
-    for tool in ("ruff", "ty", "pytest", "codespell", "pre-commit", "vulture"):
+    groups = data["dependency-groups"]
+    dev = [d.lower() for d in groups["dev"]]
+    for tool in (
+        "ruff",
+        "ty",
+        "pytest",
+        "codespell",
+        "pre-commit",
+        "vulture",
+        "deptry",
+        "pytest-asyncio",
+        "pytest-timeout",
+    ):
         if not any(d.startswith(tool) for d in dev):
             raise CheckFailed(f"dev dependency group is missing {tool}")
 
@@ -249,6 +260,25 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         )
     if data["tool"]["pytest"]["ini_options"]["testpaths"] != ["tests"]:
         raise CheckFailed("[tool.pytest.ini_options] testpaths must be ['tests']")
+
+    for group in ("docs", "property-testing", "profiling"):
+        if group not in groups:
+            raise CheckFailed(f"missing dependency group {group!r}")
+    if not any("mkdocstrings" in d for d in groups["docs"]):
+        raise CheckFailed("docs group must include mkdocstrings")
+
+    defaults = data["tool"]["uv"].get("default-groups")
+    if defaults != ["dev", "docs"]:
+        # Without this, splitting docs out of dev silently stops `uv sync`
+        # installing MkDocs, and every `uv run mkdocs ...` fails.
+        raise CheckFailed(f"[tool.uv] default-groups should be ['dev', 'docs'], got {defaults!r}")
+
+    if "deptry" not in data["tool"]:
+        raise CheckFailed("missing [tool.deptry] configuration")
+    if "S" not in ruff["lint"]["select"]:
+        raise CheckFailed("ruff should select the S (bandit) security rules")
+    if data["tool"]["coverage"]["report"].get("fail_under") != 80:
+        raise CheckFailed("[tool.coverage.report] fail_under should be 80")
 
     if not any("uv-dynamic-versioning" in req for req in data["build-system"]["requires"]):
         raise CheckFailed("build-system requires uv-dynamic-versioning")

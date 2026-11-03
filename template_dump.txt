@@ -5,30 +5,38 @@ This is a Copier template (copier.yml + template/ subdirectory).
 BRIEFING
 - Copier copies files under template/ into a new project.
 - Only *.jinja files are rendered; files without that suffix are copied verbatim.
+  (Makefile.jinja, tests/test_placeholder.py.jinja and src/<mod>/<mod>.py.jinja
+  are .jinja because they contain the module name.)
 - GitHub Actions expressions like ${{ matrix.os }} must stay in non-.jinja workflow files.
 - The repo root is NOT rendered. It holds this template's own pyproject.toml,
   its tests (template_tests/), and repo_check.py.
 
 HOW TO GENERATE A PROJECT
   uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template my-package
-  cd my-package && uv sync --all-extras
+  cd my-package && uv sync
   --vcs-ref HEAD skips tag resolution, which fails on machines where git cannot
   reach the template. Copier prompts on conflicts (.gitignore is a common one).
   Do not run copier copy inside this template source repo.
 
 TOOLCHAIN (everything configured in one pyproject.toml; no separate tool config files)
 - uv (env, lock, run, build, publish), ruff (lint + format), ty (type check),
-  pytest + pytest-cov + pytest-xdist, codespell, vulture, pre-commit, commitizen,
-  mkdocs-material.
-- devtools/lint.py runs codespell + ruff check/format/check + ty + vulture.
+  pytest + pytest-cov + pytest-xdist + pytest-sugar + pytest-timeout +
+  pytest-asyncio + pytest-mock, codespell, vulture, deptry, pre-commit,
+  commitizen, mkdocs-material + mkdocstrings.
+- devtools/lint.py runs codespell + ruff check/format/check + ty + vulture + deptry.
 - ty: python-version lives under [tool.ty.environment]; [tool.ty] only accepts
   baseline, environment, src, rules, terminal, analysis, overrides.
 - There is no [tool.uv.scripts] table: that is not a uv feature in 0.9.x. The
   Makefile and devtools/lint.py provide the shortcuts instead.
+- [tool.uv] default-groups = [dev, docs] so plain `uv sync` still installs MkDocs
+  after docs was split out of dev. Removing it breaks every `uv run mkdocs`.
 - Python floor is 3.11, kept in sync across requires-python, ruff target-version,
   ty environment, .python-version and the CI matrix. Tests enforce the sync.
-- ruff selects E,W,F,I,UP,B,C4,SIM,ARG,TCH,PTH,ERA,PGH,RUF; the formatter owns
+- ruff selects E,W,F,I,UP,B,C4,SIM,ARG,TCH,PTH,ERA,PGH,RUF,S; the formatter owns
   line length, so E501 is ignored and formatter-conflicting rules are disabled.
+- ruff S (bandit) is on; S101 is ignored in tests, S603/S607 in scripts/devtools.
+- coverage fail_under = 80, and the placeholder test covers the stub package so a
+  fresh project passes `make test` at 100%.
 - copier.yml _tasks runs git init/add/commit so new projects start as a git repo.
 
 VERIFY THE TEMPLATE
@@ -270,8 +278,10 @@ jobs:
 
       - name: Install all dependencies
         # --locked fails if uv.lock is stale instead of silently re-resolving.
-        run: uv sync --locked --all-extras
+        # Default groups (dev + docs) come from [tool.uv] default-groups.
+        run: uv sync --locked
 
+      # Runs codespell, ruff (check + format), ty, vulture and deptry.
       - name: Run linting
         run: uv run python devtools/lint.py
 
@@ -666,29 +676,31 @@ FILE: template/.pre-commit-config.yaml
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.1
+    rev: v0.17.3
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         exclude: ^(uv\.lock|\.git/)
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.8.3
+    rev: v4.19.3
     hooks:
       - id: commitizen
         stages: [commit-msg]
 
   - repo: local
     hooks:
+      # These read their paths from pyproject.toml, so no file list is passed:
+      # a hardcoded list silently drifts from [tool.ty.src] / [tool.vulture].
       - id: ty
         name: ty type check
-        entry: uv run ty check src tests devtools scripts
+        entry: uv run ty check
         language: system
         pass_filenames: false
         types: [python]
@@ -696,6 +708,15 @@ repos:
       - id: vulture
         name: vulture dead code
         entry: uv run vulture
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      # Runs on every commit but only fails when a *source* import changed the
+      # picture; it needs the env, hence language: system + uv run.
+      - id: deptry
+        name: deptry dependency check
+        entry: uv run deptry .
         language: system
         pass_filenames: false
         types: [python]
@@ -1008,7 +1029,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-FILE: template/Makefile
+FILE: template/Makefile.jinja
 ================================================================================
 # Makefile for easy development workflows.
 # See docs/development.md for docs.
@@ -1016,12 +1037,13 @@ FILE: template/Makefile
 
 .DEFAULT_GOAL := default
 
-.PHONY: default install lint test docs docs-build upgrade build clean pre-commit sync sync-once
+.PHONY: default install lint test test-random docs docs-build upgrade build clean pre-commit sync sync-once profile security
 
 default: install lint test 
 
 install:
-	uv sync --all-extras
+	# `uv sync` installs the default groups (dev + docs); extras are opt-in.
+	uv sync
 	uv run pre-commit install
 	uv run pre-commit install --hook-type commit-msg
 
@@ -1031,6 +1053,20 @@ lint:
 test:
 	uv run pytest -n auto --cov --cov-report=term-missing
 
+# Two runs, to catch order dependence and flaky timing:
+test-random:
+	uv run pytest
+	uv run pytest -p no:randomly
+
+# Dependency hygiene without running the linters. pip-audit runs from uvx so it
+# stays out of the dev group (CI does the same thing).
+security:
+	uv run deptry .
+	uvx pip-audit --skip-editable
+
+profile:
+	uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+
 docs:
 	uv run mkdocs serve
 
@@ -1038,7 +1074,8 @@ docs-build:
 	uv run mkdocs build --strict
 
 upgrade:
-	uv sync --upgrade --all-extras --dev
+	uv lock --upgrade
+	uv sync
 
 build:
 	uv build
@@ -1058,6 +1095,8 @@ clean:
 	-rm -rf *.egg-info/
 	-rm -rf .pytest_cache/
 	-rm -rf .mypy_cache/
+	-rm -rf .template-check/
+	-rm -rf profile.svg
 	-rm -rf .ruff_cache/
 	-rm -rf .coverage
 	-rm -rf coverage.xml
@@ -1177,6 +1216,9 @@ def main() -> int:
     # with the config (passing paths would silently include/exclude files).
     errcount += run(["ty", "check"])
     errcount += run(["vulture", *SRC_PATHS])
+    # deptry needs the project installed (to read package metadata), which is
+    # why the Makefile and CI call this through `uv run`.
+    errcount += run(["deptry", "."])
 
     rprint()
 
@@ -1208,6 +1250,19 @@ def run(cmd: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+================================================================================
+FILE: template/docs/api.md.jinja
+================================================================================
+# API Reference
+
+Generated from the docstrings in `{{ package_module }}` by
+[mkdocstrings](https://mkdocstrings.github.io/). Anything without a docstring
+shows up blank — which is a useful nudge to write one.
+
+## `{{ package_module }}`
+
+::: {{ package_module }}
 
 ================================================================================
 FILE: template/docs/development.md.jinja
@@ -1275,8 +1330,6 @@ uv tool install --editable .
 uv add package_name
 # Add a development dependency:
 uv add --dev package_name
-# Optional observability extras (structlog + tqdm):
-uv sync --extra observability
 # Update to latest compatible versions (including dependencies on git repos):
 uv sync --upgrade
 # Update a specific package:
@@ -1395,13 +1448,15 @@ uvx httpie GET https://httpbin.org/get
 uv tool install httpie
 ```
 
-## Logging and progress (optional extras)
+## Logging and progress
+
+`rich` and `funlog` are already dev dependencies (used by `devtools/lint.py`).
+For application code, add what you actually use:
 
 ```shell
-uv sync --extra observability
+uv add structlog      # structured logging
+uv add tqdm           # progress bars
 ```
-
-Then in application code:
 
 ```python
 import structlog
@@ -1412,6 +1467,31 @@ log.info("starting", items=10)
 
 for item in tqdm(range(10)):
     ...
+```
+
+## Profiling
+
+Profiling tools are an opt-in group, so they never slow a normal setup:
+
+```shell
+uv sync --group profiling
+uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+uv run python -m cProfile -o out.prof -m {{ package_module }}
+uv run snakeviz out.prof
+```
+
+## Property-based tests
+
+```shell
+uv sync --group property-testing
+```
+
+```python
+from hypothesis import given, strategies as st
+
+@given(st.lists(st.integers()))
+def test_roundtrip(values: list[int]) -> None:
+    assert sorted(sorted(values)) == sorted(values)
 ```
 
 ## Documentation hosting
@@ -1742,20 +1822,44 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - search.suggest
 
 plugins:
   - search
   - git-revision-date-localized:
       enable_creation_date: true
       fallback_to_build_date: true
+  # Pulls docstrings straight out of the package. Use it in a page with:
+  #   ::: {{ package_module }}
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            docstring_style: google
+            separate_signature: true
+            merge_init_into_class: true
 
 markdown_extensions:
   - pymdownx.snippets:
       base_path: ["."]
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - admonition
+  - toc:
+      permalink: true
 
 nav:
   - Home: index.md
   - Installation: installation.md
+  - API Reference: api.md
   - Development: development.md
   - Publishing: publishing.md
 
@@ -1812,10 +1916,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-observability = [
-    "structlog>=26.1.0",
-    "tqdm>=4.70.1",
-]
+# Extras are optional *runtime* features your users opt into, e.g.
+#   pip install {{ package_name }}[fast]
+# Start empty. deptry reports extras that nothing imports as unused (DEP002),
+# so only add one when the code actually uses it behind a guarded import.
+# fast = ["orjson>=3.10"]
 
 [project.urls]
 Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
@@ -1834,29 +1939,54 @@ Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
 # "uv sync --all-extras".
 
 [dependency-groups]
+# `dev` is installed by plain `uv sync` (it is uv's default group).
 dev = [
+    # Lint, format, type check.
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    "codespell>=2.4.3",
+    "vulture>=2.16",
+    "deptry>=0.25.1",
+    # Test runner + the plugins most projects end up needing.
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
     "pytest-sugar>=1.1.1",
-    "ruff>=0.17.3",
-    "ty>=0.0.96",
-    "codespell>=2.4.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-mock>=3.17.0",
+    # Git hooks, commits, releases.
     "pre-commit>=4.7.0",
     "commitizen>=4.19.3",
-    "vulture>=2.16",
     "rich>=15.0.0",
     "funlog>=0.2.1",
+]
+
+# Documentation. Split out so `--no-group docs` keeps syncs small.
+docs = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.8.0",
     "mkdocs-git-revision-date-localized-plugin>=1.6.3",
+    "mkdocstrings[python]>=1.0.8",
 ]
 
+# Optional test group for property-based tests: `uv sync --group hypothesis`.
+property-testing = [
+    "hypothesis>=6.170.14",
+]
+
+# Profiling helpers: `uv sync --group profiling`.
+profiling = [
+    "py-spy>=0.4.3",
+    "snakeviz>=2.2.2",
+]
 
 # ---- uv ----
-# uv needs no table of its own to work: `uv run <cmd>` uses the dev group, and
-# `uv sync --all-extras` adds the optional extras. Day-to-day shortcuts live in
-# the Makefile and in devtools/lint.py. If you want more, add them there.
+# Without this, splitting docs out of `dev` would silently stop `uv sync` from
+# installing MkDocs, and every `uv run mkdocs ...` would fail.
+
+[tool.uv]
+default-groups = ["dev", "docs"]
 
 # ---- Build system ----
 # Version comes from git tags: https://github.com/ninoseki/uv-dynamic-versioning/ 
@@ -1909,7 +2039,7 @@ select = [
     "ERA",     # eradicate (commented-out code)
     "PGH",     # pygrep-hooks (no blanket "# type: ignore" / "# noqa")
     "RUF",     # ruff-specific
-    # "S",     # flake8-bandit (security) — noisy for libraries, see [tool.ruff.lint.flake8-bandit]
+    "S",       # flake8-bandit (security) — remove if it gets in the way
     # "D",     # pydocstyle (docstrings) — enable once you write docstrings
     # "N",     # pep8-naming
     # "ANN",   # flake8-annotations (needs ty's ruff-era typing discipline)
@@ -1932,11 +2062,13 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests often need "unused" fixture arguments and assert inside helpers.
-"tests/**" = ["ARG001", "ARG002", "S101", "B018"]
+"tests/**" = ["ARG001", "ARG002", "S101", "B018", "S105", "S106"]
+# T201: scripts are thin wrappers that legitimately print.
+# S603/S607: they also legitimately shell out to tools like git.
+"scripts/**" = ["T201", "S603", "S607"]
+"devtools/**" = ["S603", "S607"]
 # An __init__.py re-exporting a public API looks like unused imports.
 "src/**/__init__.py" = ["F401"]
-# Scripts are thin wrappers around argparse.
-"scripts/**" = ["T201"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["{{ package_module }}"]
@@ -1979,6 +2111,7 @@ skip = "*.lock,uv.lock,.git,dist,site,htmlcov,outputs"
 # https://docs.pytest.org/en/stable/reference/reference.html#configuration-options
 
 [tool.pytest.ini_options]
+minversion = "8.0"
 python_files = ["*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -1987,12 +2120,22 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = [
     "-ra",
+    "-q",
     "--strict-markers",
     "--strict-config",
+    # Fail a hung test instead of hanging CI forever.
+    "--timeout=60",
 ]
-# Treat warnings from your own code as errors; third-party noise stays a warning.
+# Useful defaults for async projects; harmless if you never write `async def`.
+asyncio_mode = "auto"
+# Both must be explicit once asyncio_mode is set, or pytest-asyncio warns.
+asyncio_default_fixture_loop_scope = "function"
+# Treat warnings as errors so deprecations get fixed, but let plugin authors'
+# own warnings through: "error" turns a third-party deprecation into a crash.
 filterwarnings = [
-    "default",
+    "error",
+    "default::DeprecationWarning:pytest_asyncio.*",
+    "default::pytest.PytestDeprecationWarning:pytest_asyncio.*",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -2018,6 +2161,8 @@ source = [
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+# Start strict so coverage cannot quietly rot; lower it while bootstrapping.
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
@@ -2028,8 +2173,23 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
     "\\.\\.\\.",
 ]
-# Raise this as the project matures (placeholder tests start near 0%):
-# fail_under = 80
+
+# ---- deptry (dependency hygiene: unused, missing, misplaced) ----
+# https://deptry.com/usage/
+
+[tool.deptry]
+# Directories scanned for imports.
+extend_exclude = ["devtools", "scripts", "docs"]
+
+[tool.deptry.package_module_name_map]
+# Mapping a package to its import name also silences "Assuming the corresponding
+# module name of package ..." notices.
+mkdocs-material = "material"
+mkdocs-git-revision-date-localized-plugin = "mkdocs_git_revision_date_localized_plugin"
+uv-dynamic-versioning = "uv_dynamic_versioning"
+py-spy = "py_spy"
+hypothesis = "hypothesis"
+snakeviz = "snakeviz"
 
 
 # ---- Commitizen (Conventional Commits helper) ----
@@ -2583,22 +2743,45 @@ FILE: template/src/{{ package_module }}/py.typed
 
 
 ================================================================================
-FILE: template/src/{{ package_module }}/{{ package_module }}.py
+FILE: template/src/{{ package_module }}/{{ package_module }}.py.jinja
 ================================================================================
-# TODO: Add code!
+"""Command line entry point for {{ package_name }}."""
+
+from __future__ import annotations
+
+
 def main() -> None:
-    pass
+    """Entry point for the `{{ package_module }}` console script.
+
+    Replace this with your real entry point. Keeping it importable and
+    covered by a test is what makes the placeholder project green.
+    """
 
 
 if __name__ == "__main__":
     main()
 
 ================================================================================
-FILE: template/tests/test_placeholder.py
+FILE: template/tests/test_placeholder.py.jinja
 ================================================================================
-# Placeholder for an empty build.
-def test_placeholder():
-    assert True
+"""Placeholder tests.
+
+Delete these once you have real tests; they exist so that a freshly generated
+project passes `make test` including its coverage gate.
+"""
+
+from __future__ import annotations
+
+import {{ package_module }}
+from {{ package_module }} import {{ package_module }} as cli
+
+
+def test_version_is_a_string() -> None:
+    assert isinstance({{ package_module }}.__version__, str)
+
+
+def test_main_runs() -> None:
+    assert cli.main() is None
 
 ================================================================================
 FILE: template/{{_copier_conf.answers_file}}.jinja
@@ -2929,24 +3112,40 @@ python repo_check.py         # render the template + verify every generated file
 - **Makefile** — `install`, `lint`, `test`, `docs`, `build`, `clean`, `upgrade`
 - **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, pip-audit) and PyPI publish (OIDC)
 
+
+
 ### Quality & testing
 
-- **pre-commit** — git hooks (ruff, codespell, ty, vulture, commitizen)
+- **ruff** — lint **and** format, including the `S` (flake8-bandit) security rules
+- **ty** — type checking
+- **deptry** — flags unused, missing and misplaced dependencies
+- **vulture** — dead code
 - **codespell** — spelling
-- **vulture** — dead code detection
+- **pytest** + **pytest-cov** (80% gate) + **pytest-xdist** + **pytest-sugar**
+- **pytest-timeout**, **pytest-asyncio**, **pytest-mock** — hung tests, async tests, mocking
+- **hypothesis** — property-based tests (opt-in `property-testing` group)
+- **pre-commit** — git hooks (ruff, codespell, ty, vulture, deptry, commitizen)
 - **commitizen** — Conventional Commits (`uv run cz commit`)
 
 ### Security & deps
 
 - **Dependabot** — weekly updates for Actions and Python dependencies
 - **Trivy** — filesystem scan in CI
-- **pip-audit** — vulnerability audit of locked runtime dependencies
+- **pip-audit** — vulnerability audit of locked runtime dependencies (`make security`)
+- **deptry** — dependency hygiene on every lint run
+- **ruff `S` rules** — bandit-equivalent security checks inline in the linter
 
 ### Release & docs hosting
 
+- **MkDocs** + **Material** + **mkdocstrings** — docs with API reference generated from docstrings
 - **semantic-release** — GitHub Releases from Conventional Commits
 - **Read the Docs** and **GitHub Pages** configs
 
+### Extras and optional groups
+
+- `docs` — MkDocs stack (uv **default group**, so `uv sync` installs it)
+- `property-testing` — `hypothesis` (`uv sync --group property-testing`)
+- `profiling` — `py-spy` + `snakeviz` (`uv sync --group profiling`)
 ### DevEx
 
 - **.python-version** — pins the default interpreter for `uv`
@@ -3065,6 +3264,8 @@ dev = [
     # Tests for the repo tooling and the template's cross-file contracts.
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
+    # --timeout in addopts below; keeps a hung render from wedging CI.
+    "pytest-timeout>=2.4.0",
     # Dead-code check over the repo tooling ([tool.vulture] below).
     "vulture>=2.16",
 ]
@@ -3096,6 +3297,7 @@ select = [
     "ERA",    # eradicate
     "PGH",    # pygrep-hooks (blanket noqa / blanket type: ignore)
     "RUF",    # ruff-specific
+    "S",      # flake8-bandit (security)
 ]
 ignore = [
     "E501",   # line length is handled by the formatter
@@ -3109,6 +3311,8 @@ known-first-party = ["scripts", "devtools"]
 # Tests intentionally have unused arguments (fixtures) and assert outside pytest.raises.
 "test*.py" = ["ARG001", "ARG002", "S101"]
 "conftest.py" = ["ARG001"]
+# repo_check.py shells out to git/copier by design, with fixed argv (no shell).
+"repo_check.py" = ["S603", "S607"]
 
 [tool.ty.environment]
 # Keep in sync with template/pyproject.toml.jinja.
@@ -3117,9 +3321,13 @@ python-version = "3.11"
 [tool.ty.rules]
 unused-ignore-comment = "warn"
 
+# The repo's own dependency check (mirrors the template's [tool.deptry]).
+[tool.deptry]
+extend_exclude = ["template", ".template-check"]
+
 [tool.pytest.ini_options]
 testpaths = ["template_tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--timeout=120"]
 
 [tool.coverage.run]
 branch = true
@@ -3128,6 +3336,8 @@ source = ["template_tests"]
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+# The repo tooling is well covered; keep it that way.
+fail_under = 80
 
 [tool.vulture]
 min_confidence = 80
@@ -3369,8 +3579,19 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
     if project["scripts"].get(module) != f"{module}:main":
         raise CheckFailed(f"console script for {module} is wrong: {project['scripts']}")
 
-    dev = [d.lower() for d in data["dependency-groups"]["dev"]]
-    for tool in ("ruff", "ty", "pytest", "codespell", "pre-commit", "vulture"):
+    groups = data["dependency-groups"]
+    dev = [d.lower() for d in groups["dev"]]
+    for tool in (
+        "ruff",
+        "ty",
+        "pytest",
+        "codespell",
+        "pre-commit",
+        "vulture",
+        "deptry",
+        "pytest-asyncio",
+        "pytest-timeout",
+    ):
         if not any(d.startswith(tool) for d in dev):
             raise CheckFailed(f"dev dependency group is missing {tool}")
 
@@ -3387,6 +3608,25 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         )
     if data["tool"]["pytest"]["ini_options"]["testpaths"] != ["tests"]:
         raise CheckFailed("[tool.pytest.ini_options] testpaths must be ['tests']")
+
+    for group in ("docs", "property-testing", "profiling"):
+        if group not in groups:
+            raise CheckFailed(f"missing dependency group {group!r}")
+    if not any("mkdocstrings" in d for d in groups["docs"]):
+        raise CheckFailed("docs group must include mkdocstrings")
+
+    defaults = data["tool"]["uv"].get("default-groups")
+    if defaults != ["dev", "docs"]:
+        # Without this, splitting docs out of dev silently stops `uv sync`
+        # installing MkDocs, and every `uv run mkdocs ...` fails.
+        raise CheckFailed(f"[tool.uv] default-groups should be ['dev', 'docs'], got {defaults!r}")
+
+    if "deptry" not in data["tool"]:
+        raise CheckFailed("missing [tool.deptry] configuration")
+    if "S" not in ruff["lint"]["select"]:
+        raise CheckFailed("ruff should select the S (bandit) security rules")
+    if data["tool"]["coverage"]["report"].get("fail_under") != 80:
+        raise CheckFailed("[tool.coverage.report] fail_under should be 80")
 
     if not any("uv-dynamic-versioning" in req for req in data["build-system"]["requires"]):
         raise CheckFailed("build-system requires uv-dynamic-versioning")

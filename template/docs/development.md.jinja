@@ -61,8 +61,6 @@ uv tool install --editable .
 uv add package_name
 # Add a development dependency:
 uv add --dev package_name
-# Optional observability extras (structlog + tqdm):
-uv sync --extra observability
 # Update to latest compatible versions (including dependencies on git repos):
 uv sync --upgrade
 # Update a specific package:
@@ -181,13 +179,15 @@ uvx httpie GET https://httpbin.org/get
 uv tool install httpie
 ```
 
-## Logging and progress (optional extras)
+## Logging and progress
+
+`rich` and `funlog` are already dev dependencies (used by `devtools/lint.py`).
+For application code, add what you actually use:
 
 ```shell
-uv sync --extra observability
+uv add structlog      # structured logging
+uv add tqdm           # progress bars
 ```
-
-Then in application code:
 
 ```python
 import structlog
@@ -198,6 +198,31 @@ log.info("starting", items=10)
 
 for item in tqdm(range(10)):
     ...
+```
+
+## Profiling
+
+Profiling tools are an opt-in group, so they never slow a normal setup:
+
+```shell
+uv sync --group profiling
+uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+uv run python -m cProfile -o out.prof -m {{ package_module }}
+uv run snakeviz out.prof
+```
+
+## Property-based tests
+
+```shell
+uv sync --group property-testing
+```
+
+```python
+from hypothesis import given, strategies as st
+
+@given(st.lists(st.integers()))
+def test_roundtrip(values: list[int]) -> None:
+    assert sorted(sorted(values)) == sorted(values)
 ```
 
 ## Documentation hosting

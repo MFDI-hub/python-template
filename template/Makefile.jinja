@@ -4,12 +4,13 @@
 
 .DEFAULT_GOAL := default
 
-.PHONY: default install lint test docs docs-build upgrade build clean pre-commit sync sync-once
+.PHONY: default install lint test test-random docs docs-build upgrade build clean pre-commit sync sync-once profile security
 
 default: install lint test 
 
 install:
-	uv sync --all-extras
+	# `uv sync` installs the default groups (dev + docs); extras are opt-in.
+	uv sync
 	uv run pre-commit install
 	uv run pre-commit install --hook-type commit-msg
 
@@ -19,6 +20,20 @@ lint:
 test:
 	uv run pytest -n auto --cov --cov-report=term-missing
 
+# Two runs, to catch order dependence and flaky timing:
+test-random:
+	uv run pytest
+	uv run pytest -p no:randomly
+
+# Dependency hygiene without running the linters. pip-audit runs from uvx so it
+# stays out of the dev group (CI does the same thing).
+security:
+	uv run deptry .
+	uvx pip-audit --skip-editable
+
+profile:
+	uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+
 docs:
 	uv run mkdocs serve
 
@@ -26,7 +41,8 @@ docs-build:
 	uv run mkdocs build --strict
 
 upgrade:
-	uv sync --upgrade --all-extras --dev
+	uv lock --upgrade
+	uv sync
 
 build:
 	uv build
@@ -46,6 +62,8 @@ clean:
 	-rm -rf *.egg-info/
 	-rm -rf .pytest_cache/
 	-rm -rf .mypy_cache/
+	-rm -rf .template-check/
+	-rm -rf profile.svg
 	-rm -rf .ruff_cache/
 	-rm -rf .coverage
 	-rm -rf coverage.xml

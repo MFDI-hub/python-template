@@ -29,6 +29,9 @@ def main() -> int:
     # with the config (passing paths would silently include/exclude files).
     errcount += run(["ty", "check"])
     errcount += run(["vulture", *SRC_PATHS])
+    # deptry needs the project installed (to read package metadata), which is
+    # why the Makefile and CI call this through `uv run`.
+    errcount += run(["deptry", "."])
 
     rprint()
 

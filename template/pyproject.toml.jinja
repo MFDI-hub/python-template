@@ -35,10 +35,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-observability = [
-    "structlog>=26.1.0",
-    "tqdm>=4.70.1",
-]
+# Extras are optional *runtime* features your users opt into, e.g.
+#   pip install {{ package_name }}[fast]
+# Start empty. deptry reports extras that nothing imports as unused (DEP002),
+# so only add one when the code actually uses it behind a guarded import.
+# fast = ["orjson>=3.10"]
 
 [project.urls]
 Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
@@ -57,29 +58,54 @@ Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
 # "uv sync --all-extras".
 
 [dependency-groups]
+# `dev` is installed by plain `uv sync` (it is uv's default group).
 dev = [
+    # Lint, format, type check.
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    "codespell>=2.4.3",
+    "vulture>=2.16",
+    "deptry>=0.25.1",
+    # Test runner + the plugins most projects end up needing.
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
     "pytest-sugar>=1.1.1",
-    "ruff>=0.17.3",
-    "ty>=0.0.96",
-    "codespell>=2.4.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-mock>=3.17.0",
+    # Git hooks, commits, releases.
     "pre-commit>=4.7.0",
     "commitizen>=4.19.3",
-    "vulture>=2.16",
     "rich>=15.0.0",
     "funlog>=0.2.1",
+]
+
+# Documentation. Split out so `--no-group docs` keeps syncs small.
+docs = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.8.0",
     "mkdocs-git-revision-date-localized-plugin>=1.6.3",
+    "mkdocstrings[python]>=1.0.8",
 ]
 
+# Optional test group for property-based tests: `uv sync --group hypothesis`.
+property-testing = [
+    "hypothesis>=6.170.14",
+]
+
+# Profiling helpers: `uv sync --group profiling`.
+profiling = [
+    "py-spy>=0.4.3",
+    "snakeviz>=2.2.2",
+]
 
 # ---- uv ----
-# uv needs no table of its own to work: `uv run <cmd>` uses the dev group, and
-# `uv sync --all-extras` adds the optional extras. Day-to-day shortcuts live in
-# the Makefile and in devtools/lint.py. If you want more, add them there.
+# Without this, splitting docs out of `dev` would silently stop `uv sync` from
+# installing MkDocs, and every `uv run mkdocs ...` would fail.
+
+[tool.uv]
+default-groups = ["dev", "docs"]
 
 # ---- Build system ----
 # Version comes from git tags: https://github.com/ninoseki/uv-dynamic-versioning/ 
@@ -132,7 +158,7 @@ select = [
     "ERA",     # eradicate (commented-out code)
     "PGH",     # pygrep-hooks (no blanket "# type: ignore" / "# noqa")
     "RUF",     # ruff-specific
-    # "S",     # flake8-bandit (security) — noisy for libraries, see [tool.ruff.lint.flake8-bandit]
+    "S",       # flake8-bandit (security) — remove if it gets in the way
     # "D",     # pydocstyle (docstrings) — enable once you write docstrings
     # "N",     # pep8-naming
     # "ANN",   # flake8-annotations (needs ty's ruff-era typing discipline)
@@ -155,11 +181,13 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests often need "unused" fixture arguments and assert inside helpers.
-"tests/**" = ["ARG001", "ARG002", "S101", "B018"]
+"tests/**" = ["ARG001", "ARG002", "S101", "B018", "S105", "S106"]
+# T201: scripts are thin wrappers that legitimately print.
+# S603/S607: they also legitimately shell out to tools like git.
+"scripts/**" = ["T201", "S603", "S607"]
+"devtools/**" = ["S603", "S607"]
 # An __init__.py re-exporting a public API looks like unused imports.
 "src/**/__init__.py" = ["F401"]
-# Scripts are thin wrappers around argparse.
-"scripts/**" = ["T201"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["{{ package_module }}"]
@@ -202,6 +230,7 @@ skip = "*.lock,uv.lock,.git,dist,site,htmlcov,outputs"
 # https://docs.pytest.org/en/stable/reference/reference.html#configuration-options
 
 [tool.pytest.ini_options]
+minversion = "8.0"
 python_files = ["*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -210,12 +239,22 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = [
     "-ra",
+    "-q",
     "--strict-markers",
     "--strict-config",
+    # Fail a hung test instead of hanging CI forever.
+    "--timeout=60",
 ]
-# Treat warnings from your own code as errors; third-party noise stays a warning.
+# Useful defaults for async projects; harmless if you never write `async def`.
+asyncio_mode = "auto"
+# Both must be explicit once asyncio_mode is set, or pytest-asyncio warns.
+asyncio_default_fixture_loop_scope = "function"
+# Treat warnings as errors so deprecations get fixed, but let plugin authors'
+# own warnings through: "error" turns a third-party deprecation into a crash.
 filterwarnings = [
-    "default",
+    "error",
+    "default::DeprecationWarning:pytest_asyncio.*",
+    "default::pytest.PytestDeprecationWarning:pytest_asyncio.*",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -241,6 +280,8 @@ source = [
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+# Start strict so coverage cannot quietly rot; lower it while bootstrapping.
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
@@ -251,8 +292,23 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
     "\\.\\.\\.",
 ]
-# Raise this as the project matures (placeholder tests start near 0%):
-# fail_under = 80
+
+# ---- deptry (dependency hygiene: unused, missing, misplaced) ----
+# https://deptry.com/usage/
+
+[tool.deptry]
+# Directories scanned for imports.
+extend_exclude = ["devtools", "scripts", "docs"]
+
+[tool.deptry.package_module_name_map]
+# Mapping a package to its import name also silences "Assuming the corresponding
+# module name of package ..." notices.
+mkdocs-material = "material"
+mkdocs-git-revision-date-localized-plugin = "mkdocs_git_revision_date_localized_plugin"
+uv-dynamic-versioning = "uv_dynamic_versioning"
+py-spy = "py_spy"
+hypothesis = "hypothesis"
+snakeviz = "snakeviz"
 
 
 # ---- Commitizen (Conventional Commits helper) ----

@@ -55,8 +55,10 @@ jobs:
 
       - name: Install all dependencies
         # --locked fails if uv.lock is stale instead of silently re-resolving.
-        run: uv sync --locked --all-extras
+        # Default groups (dev + docs) come from [tool.uv] default-groups.
+        run: uv sync --locked
 
+      # Runs codespell, ruff (check + format), ty, vulture and deptry.
       - name: Run linting
         run: uv run python devtools/lint.py
 

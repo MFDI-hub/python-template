@@ -1,0 +1,18 @@
+"""Placeholder tests.
+
+Delete these once you have real tests; they exist so that a freshly generated
+project passes `make test` including its coverage gate.
+"""
+
+from __future__ import annotations
+
+import {{ package_module }}
+from {{ package_module }} import {{ package_module }} as cli
+
+
+def test_version_is_a_string() -> None:
+    assert isinstance({{ package_module }}.__version__, str)
+
+
+def test_main_runs() -> None:
+    assert cli.main() is None

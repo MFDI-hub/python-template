@@ -79,24 +79,40 @@ python repo_check.py         # render the template + verify every generated file
 - **Makefile** — `install`, `lint`, `test`, `docs`, `build`, `clean`, `upgrade`
 - **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, pip-audit) and PyPI publish (OIDC)
 
+
+
 ### Quality & testing
 
-- **pre-commit** — git hooks (ruff, codespell, ty, vulture, commitizen)
+- **ruff** — lint **and** format, including the `S` (flake8-bandit) security rules
+- **ty** — type checking
+- **deptry** — flags unused, missing and misplaced dependencies
+- **vulture** — dead code
 - **codespell** — spelling
-- **vulture** — dead code detection
+- **pytest** + **pytest-cov** (80% gate) + **pytest-xdist** + **pytest-sugar**
+- **pytest-timeout**, **pytest-asyncio**, **pytest-mock** — hung tests, async tests, mocking
+- **hypothesis** — property-based tests (opt-in `property-testing` group)
+- **pre-commit** — git hooks (ruff, codespell, ty, vulture, deptry, commitizen)
 - **commitizen** — Conventional Commits (`uv run cz commit`)
 
 ### Security & deps
 
 - **Dependabot** — weekly updates for Actions and Python dependencies
 - **Trivy** — filesystem scan in CI
-- **pip-audit** — vulnerability audit of locked runtime dependencies
+- **pip-audit** — vulnerability audit of locked runtime dependencies (`make security`)
+- **deptry** — dependency hygiene on every lint run
+- **ruff `S` rules** — bandit-equivalent security checks inline in the linter
 
 ### Release & docs hosting
 
+- **MkDocs** + **Material** + **mkdocstrings** — docs with API reference generated from docstrings
 - **semantic-release** — GitHub Releases from Conventional Commits
 - **Read the Docs** and **GitHub Pages** configs
 
+### Extras and optional groups
+
+- `docs` — MkDocs stack (uv **default group**, so `uv sync` installs it)
+- `property-testing` — `hypothesis` (`uv sync --group property-testing`)
+- `profiling` — `py-spy` + `snakeviz` (`uv sync --group profiling`)
 ### DevEx
 
 - **.python-version** — pins the default interpreter for `uv`

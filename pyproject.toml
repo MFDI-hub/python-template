@@ -27,6 +27,8 @@ dev = [
     # Tests for the repo tooling and the template's cross-file contracts.
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
+    # --timeout in addopts below; keeps a hung render from wedging CI.
+    "pytest-timeout>=2.4.0",
     # Dead-code check over the repo tooling ([tool.vulture] below).
     "vulture>=2.16",
 ]
@@ -58,6 +60,7 @@ select = [
     "ERA",    # eradicate
     "PGH",    # pygrep-hooks (blanket noqa / blanket type: ignore)
     "RUF",    # ruff-specific
+    "S",      # flake8-bandit (security)
 ]
 ignore = [
     "E501",   # line length is handled by the formatter
@@ -71,6 +74,8 @@ known-first-party = ["scripts", "devtools"]
 # Tests intentionally have unused arguments (fixtures) and assert outside pytest.raises.
 "test*.py" = ["ARG001", "ARG002", "S101"]
 "conftest.py" = ["ARG001"]
+# repo_check.py shells out to git/copier by design, with fixed argv (no shell).
+"repo_check.py" = ["S603", "S607"]
 
 [tool.ty.environment]
 # Keep in sync with template/pyproject.toml.jinja.
@@ -79,9 +84,13 @@ python-version = "3.11"
 [tool.ty.rules]
 unused-ignore-comment = "warn"
 
+# The repo's own dependency check (mirrors the template's [tool.deptry]).
+[tool.deptry]
+extend_exclude = ["template", ".template-check"]
+
 [tool.pytest.ini_options]
 testpaths = ["template_tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--timeout=120"]
 
 [tool.coverage.run]
 branch = true
@@ -90,6 +99,8 @@ source = ["template_tests"]
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+# The repo tooling is well covered; keep it that way.
+fail_under = 80
 
 [tool.vulture]
 min_confidence = 80
