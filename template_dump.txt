@@ -1,0 +1,3811 @@
+python-template dump for another AI
+repo: https://github.com/MFDI-hub/python-template
+This is a Copier template (copier.yml + template/ subdirectory).
+
+BRIEFING
+- Copier copies files under template/ into a new project.
+- Only *.jinja files are rendered; files without that suffix are copied verbatim.
+- GitHub Actions expressions like ${{ matrix.os }} must stay in non-.jinja workflow files.
+- The repo root is NOT rendered. It holds this template's own pyproject.toml,
+  its tests (template_tests/), and repo_check.py.
+
+HOW TO GENERATE A PROJECT
+  uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template my-package
+  cd my-package && uv sync --all-extras
+  --vcs-ref HEAD skips tag resolution, which fails on machines where git cannot
+  reach the template. Copier prompts on conflicts (.gitignore is a common one).
+  Do not run copier copy inside this template source repo.
+
+TOOLCHAIN (everything configured in one pyproject.toml; no separate tool config files)
+- uv (env, lock, run, build, publish), ruff (lint + format), ty (type check),
+  pytest + pytest-cov + pytest-xdist, codespell, vulture, pre-commit, commitizen,
+  mkdocs-material.
+- devtools/lint.py runs codespell + ruff check/format/check + ty + vulture.
+- ty: python-version lives under [tool.ty.environment]; [tool.ty] only accepts
+  baseline, environment, src, rules, terminal, analysis, overrides.
+- There is no [tool.uv.scripts] table: that is not a uv feature in 0.9.x. The
+  Makefile and devtools/lint.py provide the shortcuts instead.
+- Python floor is 3.11, kept in sync across requires-python, ruff target-version,
+  ty environment, .python-version and the CI matrix. Tests enforce the sync.
+- ruff selects E,W,F,I,UP,B,C4,SIM,ARG,TCH,PTH,ERA,PGH,RUF; the formatter owns
+  line length, so E501 is ignored and formatter-conflicting rules are disabled.
+- copier.yml _tasks runs git init/add/commit so new projects start as a git repo.
+
+VERIFY THE TEMPLATE
+  uv run --with copier python repo_check.py   # renders twice and validates output
+  uv run pytest
+  uv run ruff check .
+
+================================================================================
+FILE: template/.devcontainer/devcontainer.json
+================================================================================
+{
+  "name": "Python (uv)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/astral-sh/uv-feature/uv:1": {}
+  },
+  "postCreateCommand": "uv sync --all-extras && uv run pre-commit install && uv run pre-commit install --hook-type commit-msg",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "astral-sh.ty",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "always",
+            "source.organizeImports.ruff": "always"
+          }
+        }
+      }
+    }
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "MkDocs",
+      "onAutoForward": "notify"
+    }
+  }
+}
+
+================================================================================
+FILE: template/.github/ISSUE_TEMPLATE/bug_report.yml
+================================================================================
+name: Bug report
+description: Report something that is broken or incorrect
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version, git commit, or tag.
+      placeholder: e.g. v0.1.0
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, and any relevant context.
+      placeholder: |
+        - OS: ...
+        - Python: ...
+        - uv: ...
+
+================================================================================
+FILE: template/.github/ISSUE_TEMPLATE/config.yml.jinja
+================================================================================
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/{{ package_github_org }}/{{ package_name }}/blob/main/SECURITY.md
+    about: Report a security vulnerability privately (see SECURITY.md).
+
+================================================================================
+FILE: template/.github/ISSUE_TEMPLATE/feature_request.yml
+================================================================================
+name: Feature request
+description: Suggest an idea or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem does this solve, or what workflow would it improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature you'd like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches you've thought about.
+
+================================================================================
+FILE: template/.github/dependabot.yml
+================================================================================
+# Dependabot keeps GitHub Actions and Python deps up to date.
+# https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Dependabot reads pyproject.toml / uv.lock for Python projects.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+================================================================================
+FILE: template/.github/pull_request_template.md
+================================================================================
+## Summary
+
+<!-- What does this PR change and why? -->
+
+## Type of change
+
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+- [ ] Chore / maintenance
+
+## Checklist
+
+- [ ] I ran `uv run python devtools/lint.py` locally
+- [ ] I ran `uv run pytest` locally (or confirmed tests are not applicable)
+- [ ] I updated documentation when behavior or public APIs changed
+- [ ] My commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+
+## Related issues
+
+<!-- Link issues with "Fixes #123" or "Relates to #123" when applicable -->
+
+================================================================================
+FILE: template/.github/workflows/ci.yml
+================================================================================
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: CI
+
+on:
+  push:
+    # Use ["main", "master"] for CI only on the default branch.
+    # Use ["**"] for CI on all branches.
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # Update this as needed:
+        # Common platforms: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        os: ["ubuntu-latest"]
+        # Matches requires-python in pyproject.toml (>=3.11).
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    # Linux only by default. Use ${{ matrix.os }} for other OSes.
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # Generally following uv docs:
+      # https://docs.astral.sh/uv/guides/integration/github/
+
+      - name: Checkout (official GitHub action)
+        uses: actions/checkout@v7
+        with:
+          # Important for versioning plugins:
+          fetch-depth: 0
+
+      - name: Install uv (official Astral action)
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          # Pin a full version: from v8 on, major tags like "@v10" do not resolve.
+          # Update this as needed.
+          version: "0.13.7"
+          enable-cache: true
+          # Creates the matrix interpreter if it is missing.
+          python-version: ${{ matrix.python-version }}
+
+      # Alternately can use the official Python action:
+      # - name: Set up Python (using actions/setup-python)
+      #   uses: actions/setup-python@v7
+      #   with:
+      #     python-version: ${{ matrix.python-version }}
+
+      - name: Install all dependencies
+        # --locked fails if uv.lock is stale instead of silently re-resolving.
+        run: uv sync --locked --all-extras
+
+      - name: Run linting
+        run: uv run python devtools/lint.py
+
+      - name: Run tests with coverage
+        run: >
+          uv run pytest -n auto
+          --cov
+          --cov-report=term-missing
+          --cov-report=xml
+
+      - name: Verify Docs Build
+        run: uv run mkdocs build --strict
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run Trivy vulnerability scanner
+        # Pin to commit SHA (v0.36.0) — prefer SHA over mutable tags for Actions.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Export dependencies
+        # --no-emit-project omits this package (not yet on PyPI) from the audit.
+        run: uv export --locked --no-dev --no-emit-project --format requirements.txt > /tmp/requirements.txt
+
+      - name: Run pip-audit
+        run: uvx pip-audit -r /tmp/requirements.txt
+
+================================================================================
+FILE: template/.github/workflows/docs.yml
+================================================================================
+name: Deploy MkDocs
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Build docs
+        run: uv run mkdocs build --strict
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+================================================================================
+FILE: template/.github/workflows/publish.yml
+================================================================================
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Enable manual trigger.
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Mandatory for OIDC.
+      contents: read
+    steps:
+      - name: Checkout (official GitHub action)
+        uses: actions/checkout@v7
+        with:
+          # Important for versioning plugins:
+          fetch-depth: 0
+
+      - name: Install uv (official Astral action)
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install all dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run tests
+        run: uv run pytest -n auto --cov --cov-report=term-missing
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always
+        # Although uv is newer and faster, the "official" publishing option is the one from PyPA,
+        # which uses twine. If desired, replace `uv publish` with:
+        # uses: pypa/gh-action-pypi-publish@release/v1
+
+================================================================================
+FILE: template/.github/workflows/release.yml
+================================================================================
+name: Semantic Release
+
+# Creates a GitHub Release (and tag) from Conventional Commits on main/master.
+# That release triggers publish.yml → PyPI. Version numbers come from the tag
+# via uv-dynamic-versioning (no pyproject.toml rewrite).
+#
+# Requires Conventional Commits (enforced locally via Commitizen).
+# Manual releases still work via GitHub Releases UI — see docs/publishing.md.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v8
+        with:
+          # package.json here exists only for .releaserc.yml; never publish to npm
+          # (otherwise a package missing from npm breaks the release run).
+          skip_npm_plugin: true
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+================================================================================
+FILE: template/.gitignore
+================================================================================
+# Additions to standard GitHub .gitignore:
+*.bak
+*.orig
+tmp/
+trash/
+attic/
+.kash/
+outputs/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# UV
+#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#uv.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#pdm.lock
+#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+#   in version control.
+#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+# PyPI configuration file
+.pypirc
+
+================================================================================
+FILE: template/.pre-commit-config.yaml
+================================================================================
+# Pre-commit hooks for local quality checks.
+# Install once: `uv run pre-commit install`
+# Run manually: `uv run pre-commit run --all-files`
+# Docs: https://pre-commit.com/
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        exclude: ^(uv\.lock|\.git/)
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.8.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty type check
+        entry: uv run ty check src tests devtools scripts
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: vulture
+        name: vulture dead code
+        entry: uv run vulture
+        language: system
+        pass_filenames: false
+        types: [python]
+
+================================================================================
+FILE: template/.python-version
+================================================================================
+3.13
+
+================================================================================
+FILE: template/.readthedocs.yaml
+================================================================================
+# Read the Docs config for MkDocs hosting (optional alternative to GitHub Pages).
+# Enable the project at https://readthedocs.org/ after pushing this file.
+# https://docs.readthedocs.io/en/stable/config-file/v2.html
+
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.13"
+
+mkdocs:
+  configuration: mkdocs.yml
+  fail_on_warning: true
+
+python:
+  install:
+    - requirements: docs/requirements-rtd.txt
+
+================================================================================
+FILE: template/.releaserc.yml
+================================================================================
+# semantic-release config (Node). Creates GitHub releases/tags from
+# Conventional Commits without rewriting pyproject.toml — version stays
+# driven by git tags via uv-dynamic-versioning.
+# https://semantic-release.gitbook.io/
+
+branches:
+  - main
+  - master
+
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - "@semantic-release/github"
+
+tagFormat: "v${version}"
+
+================================================================================
+FILE: template/.vscode/settings.json
+================================================================================
+{
+  // (Optional) Let VSCode auto‑detect the venv – you can omit this entirely.
+  // If you keep it, use a forward‑slash path that works on all OSes:
+  // "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  // Let the Python extension activate the venv in every new terminal
+  "python.terminal.activateEnvironment": true,
+  // No custom terminal profile needed – use the system's default shell
+  // (remove "terminal.integrated.defaultProfile.windows" and "profiles.windows")
+  // Formatting settings (unchanged)
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "always",
+      "source.organizeImports.ruff": "always"
+    }
+  },
+  // Type checking is done by ty (astral-sh.ty extension), which reads [tool.ty]
+  // from pyproject.toml. Pylance/Pyright is not used by this project.
+  "python.languageServer": "None"
+}
+
+================================================================================
+FILE: template/.vscode/tasks.json
+================================================================================
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "install",
+      "type": "shell",
+      "command": "uv sync --all-extras",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "uv run python devtools/lint.py",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "uv run pytest -n auto --cov --cov-report=term-missing",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "docs",
+      "type": "shell",
+      "command": "uv run mkdocs serve",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "docs-build",
+      "type": "shell",
+      "command": "uv run mkdocs build --strict",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "uv build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "pre-commit",
+      "type": "shell",
+      "command": "uv run pre-commit run --all-files",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "upgrade",
+      "type": "shell",
+      "command": "uv sync --upgrade --all-extras --dev",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "sync-chosen-files",
+      "type": "shell",
+      "command": "uv run sync-chosen-files --once",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
+
+================================================================================
+FILE: template/CODE_OF_CONDUCT.md.jinja
+================================================================================
+# Contributor Covenant Code of Conduct
+
+## Our Pledge
+
+We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone, regardless of age, body
+size, visible or invisible disability, ethnicity, sex characteristics, gender
+identity and expression, level of experience, education, socio-economic status,
+nationality, personal appearance, race, caste, color, religion, or sexual
+identity and orientation.
+
+We pledge to act and interact in ways that contribute to an open, welcoming,
+diverse, inclusive, and healthy community.
+
+## Our Standards
+
+Examples of behavior that contributes to a positive environment:
+
+- Demonstrating empathy and kindness toward other people
+- Being respectful of differing opinions, viewpoints, and experiences
+- Giving and gracefully accepting constructive feedback
+- Accepting responsibility and apologizing to those affected by our mistakes,
+  and learning from the experience
+- Focusing on what is best not just for us as individuals, but for the overall
+  community
+
+Examples of unacceptable behavior:
+
+- The use of sexualized language or imagery, and sexual attention or advances of
+  any kind
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as a physical or email address,
+  without their explicit permission
+- Other conduct which could reasonably be considered inappropriate in a
+  professional setting
+
+## Enforcement Responsibilities
+
+Community leaders are responsible for clarifying and enforcing our standards of
+acceptable behavior and will take appropriate and fair corrective action in
+response to any behavior that they deem inappropriate, threatening, offensive,
+or harmful.
+
+## Scope
+
+This Code of Conduct applies within all community spaces, and also applies when
+an individual is officially representing the community in public spaces.
+
+## Enforcement
+
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to the community leaders responsible for enforcement at
+**{{ package_author_email }}**. All complaints will be reviewed and investigated
+promptly and fairly.
+
+## Attribution
+
+This Code of Conduct is adapted from the [Contributor Covenant][homepage],
+version 2.1, available at
+<https://www.contributor-covenant.org/version/2/1/code_of_conduct.html>.
+
+[homepage]: https://www.contributor-covenant.org
+
+================================================================================
+FILE: template/CONTRIBUTING.md.jinja
+================================================================================
+# Contributing
+
+Thanks for your interest in contributing to **{{ package_name }}**!
+
+## Getting started
+
+1. Fork and clone the repository.
+2. Install dependencies and git hooks:
+
+   ```shell
+   uv sync --all-extras
+   uv run pre-commit install
+   ```
+
+3. Create a branch for your change.
+
+## Development workflow
+
+```shell
+uv run python devtools/lint.py
+uv run pytest -n auto --cov --cov-report=term-missing
+uv run mkdocs build --strict
+```
+
+See [development.md](docs/development.md) for full details.
+
+## Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) so automated releases work:
+
+```text
+feat: add new capability
+fix: correct edge case in parser
+docs: clarify installation steps
+```
+
+You can use Commitizen interactively:
+
+```shell
+uv run cz commit
+```
+
+## Pull requests
+
+- Keep changes focused and reasonably sized.
+- Update docs when behavior or public APIs change.
+- Ensure CI passes before requesting review.
+- Link related issues when applicable.
+
+## Reporting issues
+
+Use the GitHub issue templates for bugs and feature requests. Include steps to
+reproduce, expected vs. actual behavior, and your environment when relevant.
+
+## Code of conduct
+
+This project follows our [Code of Conduct](CODE_OF_CONDUCT.md). Please be respectful
+and constructive in all interactions.
+
+================================================================================
+FILE: template/LICENSE.jinja
+================================================================================
+MIT License
+
+Copyright (c) {{ copyright_year }} {{ package_author_name }}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+FILE: template/Makefile
+================================================================================
+# Makefile for easy development workflows.
+# See docs/development.md for docs.
+# Note GitHub Actions call uv directly, not this Makefile.
+
+.DEFAULT_GOAL := default
+
+.PHONY: default install lint test docs docs-build upgrade build clean pre-commit sync sync-once
+
+default: install lint test 
+
+install:
+	uv sync --all-extras
+	uv run pre-commit install
+	uv run pre-commit install --hook-type commit-msg
+
+lint:
+	uv run python devtools/lint.py
+
+test:
+	uv run pytest -n auto --cov --cov-report=term-missing
+
+docs:
+	uv run mkdocs serve
+
+docs-build:
+	uv run mkdocs build --strict
+
+upgrade:
+	uv sync --upgrade --all-extras --dev
+
+build:
+	uv build
+
+pre-commit:
+	uv run pre-commit run --all-files
+
+sync:
+	uv run sync-chosen-files
+
+sync-once:
+	uv run sync-chosen-files --once
+
+clean:
+	-rm -rf dist/
+	-rm -rf site/
+	-rm -rf *.egg-info/
+	-rm -rf .pytest_cache/
+	-rm -rf .mypy_cache/
+	-rm -rf .ruff_cache/
+	-rm -rf .coverage
+	-rm -rf coverage.xml
+	-rm -rf htmlcov/
+	-rm -rf outputs/
+	-rm -rf .venv/
+	-find . -type d -name "__pycache__" -exec rm -rf {} +
+
+================================================================================
+FILE: template/README.md.jinja
+================================================================================
+# {{ package_name }}
+
+> **This is the initial readme for your project from the
+> [python-template](https://github.com/MFDI-hub/python-template) Copier template.** Fill it in and
+> delete this message!
+> Below are general setup instructions that you may remove or keep and adapt for your
+> project.
+
+* * *
+
+## Project Docs
+
+For how to install uv and Python, see [installation.md](docs/installation.md).
+
+For development workflows, see [development.md](docs/development.md).
+
+For instructions on publishing to PyPI, see [publishing.md](docs/publishing.md).
+
+## Quickstart
+
+```shell
+# Install project dependencies + git hooks:
+make install
+# or: uv sync --all-extras && uv run pre-commit install
+
+# Run quality checks:
+uv run python devtools/lint.py
+uv run pytest -n auto --cov --cov-report=term-missing
+
+# Build package artifacts:
+uv build
+```
+
+## Lockfile (`uv.lock`)
+
+`make install` / `uv sync` creates a `uv.lock` for reproducible development
+environments. For **libraries**, you may choose not to commit `uv.lock` so consumers
+are not pinned to your exact dependency tree. For **applications**, commit `uv.lock`
+so deployments are reproducible.
+
+* * *
+
+*This project was built from
+[python-template](https://github.com/MFDI-hub/python-template).*
+
+================================================================================
+FILE: template/SECURITY.md.jinja
+================================================================================
+# Security Policy
+
+## Supported versions
+
+Security fixes are provided for the latest release on the default branch (`main` or
+`master`). Older releases may not receive patches.
+
+## Reporting a vulnerability
+
+**Please do not open a public GitHub issue for security vulnerabilities.**
+
+Report security issues privately to **{{ package_author_email }}**. Include:
+
+- A description of the issue and potential impact
+- Steps to reproduce or a proof of concept, if available
+- Affected versions or commits
+
+We aim to acknowledge reports within a few business days and will work with you on
+a fix and coordinated disclosure when appropriate.
+
+## Dependency updates
+
+Known vulnerable dependencies are monitored in CI via Trivy and `pip-audit`. If you
+discover a vulnerable dependency in this project, please include the package name
+and advisory ID in your report when possible.
+
+================================================================================
+FILE: template/devtools/lint.py
+================================================================================
+import subprocess
+
+from funlog import log_calls
+from rich import get_console, print as rprint, reconfigure
+
+# Update as needed. These paths must match the tool configs in pyproject.toml
+# ([tool.ruff.lint.isort] known-first-party, [tool.ty.src] include, ...).
+SRC_PATHS = ["src", "tests", "devtools", "scripts"]
+DOC_PATHS = ["README.md", "docs", "CONTRIBUTING.md"]
+
+# Files worth spell-checking that are neither source nor docs.
+OTHER_SPELL_PATHS = ["pyproject.toml", "Makefile", "mkdocs.yml"]
+
+
+reconfigure(emoji=not get_console().options.legacy_windows)  # No emojis on legacy windows.
+
+
+def main() -> int:
+    rprint()
+
+    errcount = 0
+    errcount += run(["codespell", "--write-changes", *SRC_PATHS, *DOC_PATHS, *OTHER_SPELL_PATHS])
+    # Fix what can be fixed, then let the formatter and type checker work on
+    # the result; the last ruff pass reports anything left over.
+    errcount += run(["ruff", "check", "--fix", *SRC_PATHS])
+    errcount += run(["ruff", "format", *SRC_PATHS])
+    errcount += run(["ruff", "check", *SRC_PATHS])
+    # ty reads [tool.ty] in pyproject.toml, so it needs no paths to stay in sync
+    # with the config (passing paths would silently include/exclude files).
+    errcount += run(["ty", "check"])
+    errcount += run(["vulture", *SRC_PATHS])
+
+    rprint()
+
+    if errcount != 0:
+        rprint(f"[bold red]:x: Lint failed with {errcount} errors.[/bold red]")
+    else:
+        rprint("[bold green]:white_check_mark: Lint passed![/bold green]")
+    rprint()
+
+    return errcount
+
+
+@log_calls(level="warning", show_timing_only=True)
+def run(cmd: list[str]) -> int:
+    rprint()
+    rprint(f"[bold green]>> {' '.join(cmd)}[/bold green]")
+    errcount = 0
+    try:
+        subprocess.run(cmd, text=True, check=True)
+    except KeyboardInterrupt:
+        rprint("[yellow]Keyboard interrupt - Cancelled[/yellow]")
+        errcount = 1
+    except subprocess.CalledProcessError as e:
+        rprint(f"[bold red]Error: {e}[/bold red]")
+        errcount = 1
+
+    return errcount
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+================================================================================
+FILE: template/docs/development.md.jinja
+================================================================================
+# Development
+
+## Setting Up uv
+
+This project is set up to use [uv](https://docs.astral.sh/uv/) to manage Python and
+dependencies. First, be sure you
+[have uv installed](https://docs.astral.sh/uv/getting-started/installation/).
+
+Then
+[fork the {{package_github_org}}/{{package_name}} repo](https://github.com/{{package_github_org}}/{{package_name}}/fork)
+(having your own fork will make it easier to contribute) and
+[clone it](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
+
+## Basic Developer Workflows
+
+The `Makefile` simply offers shortcuts to `uv` commands for developer convenience.
+(For clarity, GitHub Actions don’t use the Makefile and just call `uv` directly.)
+
+```shell
+# First, install all dependencies, set up the venv, and install git hooks.
+# This runs `uv sync --all-extras` and `pre-commit install`.
+make install
+
+# Run uv sync, lint, and test:
+make
+
+# Build wheel:
+make build
+
+# Linting (codespell, ruff, ty, vulture):
+make lint
+# or, without make:
+uv run python devtools/lint.py
+
+# Run tests (parallel + coverage):
+make test
+
+# Run all pre-commit hooks on the whole tree:
+make pre-commit
+
+# Preview documentation locally (MkDocs + Material):
+make docs
+
+# Delete all the build artifacts:
+make clean
+
+# Upgrade dependencies to compatible versions:
+make upgrade
+
+# To run tests by hand:
+uv run pytest   # all tests
+uv run pytest -n auto --cov --cov-report=term-missing
+uv run pytest -s src/module/some_file.py  # one test, showing outputs
+
+# Build and install current dev executables, to let you use your dev copies
+# as local tools:
+uv tool install --editable .
+
+# Dependency management directly with uv:
+# Add a new dependency:
+uv add package_name
+# Add a development dependency:
+uv add --dev package_name
+# Optional observability extras (structlog + tqdm):
+uv sync --extra observability
+# Update to latest compatible versions (including dependencies on git repos):
+uv sync --upgrade
+# Update a specific package:
+uv lock --upgrade-package package_name
+# Update dependencies on a package:
+uv add package_name@latest
+
+# Run a shell within the Python environment:
+uv venv
+source .venv/bin/activate
+# On Windows PowerShell:
+# .venv\Scripts\Activate.ps1
+```
+
+See [uv docs](https://docs.astral.sh/uv/) for details.
+
+### Running individual tools
+
+All tool configuration lives in `pyproject.toml`, so each tool can also be driven
+directly (this is what editors and CI do):
+
+```shell
+uv run ruff check .            # lint
+uv run ruff check --fix .      # lint + autofix
+uv run ruff format .           # format (or --check to verify only)
+uv run ty check                # type check (paths come from [tool.ty.src])
+uv run codespell               # spelling
+uv run vulture                 # dead code
+uv run pytest                  # tests
+uv run pytest -n auto -k name  # parallel, filtered
+```
+
+The `Makefile` wraps the common combinations (`make install`, `make lint`, `make test`,
+`make docs-build`), and `devtools/lint.py` runs the whole lint chain in one go.
+
+`ty` is pre-1.0. If a third-party package ships no type information, prefer
+`[tool.ty.analysis] allowed-unresolved-imports` over sprinkling `# type: ignore`.
+Run `uv run ty check --output-format concise` to see rule names for `[tool.ty.rules]`.
+
+## Sync chosen files
+
+`scripts/sync_chosen_files.py` watches selected source paths and writes a single text
+dump (useful for sharing code with LLMs or archiving a snapshot).
+
+Edit `scripts/chosen_files.txt` to list files or directories (one path per line).
+Then:
+
+```shell
+# One-shot dump:
+uv run sync-chosen-files --once
+
+# Watch and re-sync on changes:
+uv run sync-chosen-files
+
+# Custom paths or output file:
+uv run sync-chosen-files --dir src/{{ package_module }} --out outputs/builds/source_dump.txt --once
+uv run sync-chosen-files --file-list scripts/chosen_files.txt --ext py,toml --once
+```
+
+Output defaults to `outputs/builds/source_dump.txt` (gitignored).
+
+## Pre-commit and Commitizen
+
+Install hooks once (also done by `make install`):
+
+```shell
+uv run pre-commit install
+uv run pre-commit install --hook-type commit-msg
+```
+
+Hooks run ruff, codespell, ty, and vulture on commit. Commit messages should follow
+[Conventional Commits](https://www.conventionalcommits.org/) (required for automated
+releases). Use Commitizen interactively:
+
+```shell
+uv run cz commit
+# or validate the last message:
+uv run cz check --rev-range HEAD~1..HEAD
+```
+
+## IDE setup
+
+If you use VS Code or a fork like Cursor or Windsurf, you can install the following
+extensions:
+
+- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
+- [ty](https://marketplace.visualstudio.com/items?itemName=astral-sh.ty)
+  for type checking and the ty language server. Note that this extension works with
+  non-Microsoft VS Code forks like Cursor.
+- [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+
+This repo also includes:
+
+- **VS Code Tasks** (`.vscode/tasks.json`) — Run Task → `install` / `lint` / `test` / `docs` / …
+- **Dev Container** (`.devcontainer/devcontainer.json`) — open in Codespaces or
+  “Reopen in Container” for a ready uv + pre-commit environment
+
+## Local CI with act
+
+To run GitHub Actions workflows locally (optional):
+
+```shell
+# https://nektosact.com/
+brew install act   # or see act install docs for your OS
+act push           # simulate a push event (runs CI)
+act -l             # list jobs
+```
+
+## HTTP client (httpie)
+
+Handy for poking at HTTP APIs without adding a project dependency:
+
+```shell
+uvx httpie GET https://httpbin.org/get
+# or install as a user tool:
+uv tool install httpie
+```
+
+## Logging and progress (optional extras)
+
+```shell
+uv sync --extra observability
+```
+
+Then in application code:
+
+```python
+import structlog
+from tqdm import tqdm
+
+log = structlog.get_logger()
+log.info("starting", items=10)
+
+for item in tqdm(range(10)):
+    ...
+```
+
+## Documentation hosting
+
+Local and CI use MkDocs. For hosted docs you can:
+
+- **GitHub Pages** — `.github/workflows/docs.yml` builds and deploys on push to
+  `main`/`master`. Enable Pages in repo settings: **Settings → Pages → Build and
+  deployment → GitHub Actions**.
+- **Read the Docs** — import the repo on [Read the Docs](https://readthedocs.org/);
+  `.readthedocs.yaml` is already included.
+
+## Project management on GitHub
+
+Optional GitHub features (not code):
+
+- [Milestones](https://docs.github.com/en/issues/using-labels-and-milestones-for-issues-and-pull-requests/about-milestones)
+  for version-scoped work
+- [Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects)
+  (boards) for kanban-style tracking
+
+## Publishing Releases
+
+See [publishing.md](publishing.md) for instructions on publishing to PyPI (manual
+releases and semantic-release).
+
+## Documentation
+
+- [uv docs](https://docs.astral.sh/uv/)
+- [ty docs](https://docs.astral.sh/ty/)
+- [MkDocs documentation](https://www.mkdocs.org/)
+- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
+- [pre-commit](https://pre-commit.com/)
+- [Commitizen](https://commitizen-tools.github.io/commitizen/)
+- [semantic-release](https://semantic-release.gitbook.io/)
+- [Trivy](https://trivy.dev/)
+
+* * *
+
+*This file was built with
+[python-template](https://github.com/MFDI-hub/python-template).*
+
+================================================================================
+FILE: template/docs/index.md
+================================================================================
+# Welcome
+
+This documentation is generated with [MkDocs](https://www.mkdocs.org/) and
+[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).
+
+## Guides
+
+- [Installation](installation.md) — install uv and Python
+- [Development](development.md) — day-to-day workflows, hooks, and tooling
+- [Publishing](publishing.md) — releases and PyPI
+
+For a project overview, see the repository `README.md`.
+
+================================================================================
+FILE: template/docs/installation.md
+================================================================================
+## Installing uv and Python
+
+This project is set up to use [**uv**](https://docs.astral.sh/uv/) for Python and
+dependency management.
+
+### Install uv
+
+On macOS or Linux:
+
+```shell
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+If you use Homebrew (macOS):
+
+```shell
+brew update
+brew install uv
+```
+
+See [uv's docs](https://docs.astral.sh/uv/getting-started/installation/) for all
+supported installation methods.
+
+### Install Python with uv
+
+```shell
+uv python install 3.13
+```
+
+You can choose any compatible version required by this project.
+
+### Install project dependencies
+
+From your project root:
+
+```shell
+uv sync --all-extras
+```
+
+This creates `.venv` and installs runtime + development dependencies.
+
+================================================================================
+FILE: template/docs/publishing.md
+================================================================================
+## Publishing Releases
+
+This is how to publish a Python package to [**PyPI**](https://pypi.org/) from GitHub
+Actions, when using the
+[**python-template**](https://github.com/MFDI-hub/python-template) template.
+
+Thanks to
+[the dynamic versioning plugin](https://github.com/ninoseki/uv-dynamic-versioning/),
+the [`release.yml`](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/release.yml)
+workflow (semantic-release), and the [`publish.yml`](https://github.com/MFDI-hub/python-template/blob/main/template/.github/workflows/publish.yml)
+workflow, tagged GitHub Releases publish the matching version to PyPI.
+
+You can release in either way:
+
+1. **Automatic (recommended):** push Conventional Commits to `main`/`master`. The
+   semantic-release workflow creates a GitHub Release + `vX.Y.Z` tag when commits warrant
+   a bump. That release triggers `publish.yml`.
+2. **Manual:** create a tagged release yourself in the GitHub UI or with `gh` (below).
+
+### First-Time Setup
+
+This part is a little confusing the first time.
+Here is the simplest way to do it.
+For the purposes of this example replace OWNER and PROJECT with the right values.
+
+**Note:** These steps assume you already have a GitHub repo with your code pushed. If
+you're setting up manually, create an **empty** GitHub repo (no
+README, no .gitignore, no license — the template already provides these) and push your
+code to it. See the
+[python-template README](https://github.com/MFDI-hub/python-template)
+for Copier usage and repo layout.
+
+1. **Get a PyPI account** at [pypi.org](https://pypi.org/) and sign in.
+
+2. **Pick a name for the project** that isn’t already taken.
+
+   - Go to `https://pypi.org/project/PROJECT` to see if another project with that name
+     already exists.
+
+   - If needed, update your `pyproject.toml` with the correct name.
+
+3. **Authorize** your repository to publish to PyPI:
+
+   - Go to [the publishing settings page](https://pypi.org/manage/account/publishing/).
+
+   - Find “Trusted Publisher Management” and register your GitHub repo as a new
+     “pending” trusted publisher.
+
+   - Enter the project name, repo owner, repo name, and `publish.yml` as the workflow
+     name. (You can leave the “environment name” field blank.)
+
+4. **Create a first release** so versioning starts on `0.x` (optional but recommended):
+
+   semantic-release’s first release is `1.0.0` if no tags exist. To stay on `0.x`, create
+   an initial tag once after setup:
+
+   ```shell
+   git tag v0.1.0
+   git push origin v0.1.0
+   gh release create v0.1.0 --generate-notes
+   ```
+
+   Later bumps follow Conventional Commits automatically.
+
+5. **Confirm it publishes to PyPI**
+
+   - Watch for the release workflow in the GitHub Actions tab.
+
+   - If it succeeds, you should see it appear at `https://pypi.org/project/PROJECT`.
+
+### Publishing Subsequent Releases
+
+Follow this checklist for each new release.
+
+#### Pre-Release Checklist
+
+1. **Verify all changes are committed and pushed:**
+
+   ```shell
+   git status
+   git log origin/main..HEAD  # should be empty if pushed
+   ```
+
+2. **Run linting and tests locally:**
+
+   ```shell
+   make lint
+   make test
+   ```
+
+3. **Confirm CI is passing:**
+
+   ```shell
+   gh run list --limit 3
+   ```
+
+   Or check the Actions tab on GitHub.
+
+4. **Determine the new version number** (manual releases only):
+
+   ```shell
+   # Check current/latest version:
+   gh release list --limit 1
+   ```
+
+   Use [semantic versioning](https://semver.org/) / Conventional Commits:
+
+   - **fix:** → patch (e.g. `v0.5.8` → `v0.5.9`)
+   - **feat:** → minor (e.g. `v0.5.9` → `v0.6.0`)
+   - **BREAKING CHANGE** / `!` → major (e.g. `v0.6.0` → `v1.0.0`)
+
+#### Create the Release
+
+5. **Automatic:** merge Conventional Commits to `main` and let `release.yml` create the
+   GitHub Release.
+
+6. **Manual — create the release with `gh`:**
+
+   ```shell
+   NEW_TAG="vX.Y.Z"  # Replace with actual version
+   LAST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+   
+   gh release create "${NEW_TAG}" \
+     --title "${NEW_TAG}" \
+     --notes "$(cat <<'EOF'
+   ## What's Changed
+   
+   [Summarize changes here--see format guide below]
+   
+   ### Full Changelog
+   
+   https://github.com/OWNER/PROJECT/compare/${LAST_TAG}...${NEW_TAG}
+   EOF
+   )"
+   ```
+
+   Alternatively, use `--generate-notes` for GitHub’s auto-generated notes, or
+   `--notes-file FILENAME` to read from a file.
+
+7. **Verify the release published successfully:**
+
+   ```shell
+   # Check the release workflow:
+   gh run list --workflow=publish.yml --limit 1
+   
+   # Verify on PyPI (may take a minute):
+   # https://pypi.org/project/PROJECT
+   ```
+
+### Release Notes Format
+
+Use this structure for release notes (manual releases):
+
+```markdown
+## What's Changed
+
+### Bug Fixes
+
+**Short title of fix**
+
+Description of what was fixed and why it matters.
+
+### New Features
+
+**Short title of feature**
+
+Description of the new capability.
+
+### Breaking Changes
+
+**Short title of breaking change**
+
+Description of what changed and how to migrate.
+
+### Full Changelog
+
+https://github.com/OWNER/PROJECT/compare/vPREVIOUS...vNEW
+```
+
+Guidelines:
+
+- Use `## What's Changed` as the top-level heading.
+
+- Group changes under `### Bug Fixes`, `### New Features`, `### Breaking Changes`, etc.
+  as appropriate.
+
+- Use `**bold**` for short titles of individual changes.
+
+- Include technical details only when helpful for users.
+
+- Always include the Full Changelog compare link at the end.
+
+- For small releases, a simple bullet list is acceptable instead of full sections.
+
+* * *
+
+*This file was built with
+[python-template](https://github.com/MFDI-hub/python-template).*
+
+================================================================================
+FILE: template/docs/requirements-rtd.txt
+================================================================================
+# Minimal deps for Read the Docs builds (see .readthedocs.yaml).
+mkdocs>=1.6
+mkdocs-material>=9.5
+mkdocs-git-revision-date-localized-plugin
+
+================================================================================
+FILE: template/mkdocs.yml.jinja
+================================================================================
+site_name: "{{ package_name }}"
+site_description: "{{ package_description }}"
+
+repo_url: https://github.com/{{ package_github_org }}/{{ package_name }}
+repo_name: {{ package_github_org }}/{{ package_name }}
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      fallback_to_build_date: true
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["."]
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Development: development.md
+  - Publishing: publishing.md
+
+================================================================================
+FILE: template/package.json.jinja
+================================================================================
+{
+  "name": "{{ package_name }}",
+  "version": "0.0.0-semantically-released",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/{{ package_github_org }}/{{ package_name }}.git"
+  }
+}
+
+================================================================================
+FILE: template/pyproject.toml.jinja
+================================================================================
+# ---- Project info ----
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/
+
+# Standard project metadata. [project] must come first: TOML tables cannot be
+# reopened later in the file.
+[project]
+name = "{{ package_name }}"
+description = "{{ package_description }}"
+authors = [
+    { name = "{{ package_author_name }}", email = "{{ package_author_email }}" },
+]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+# Version comes from git tags at build time (see [tool.uv-dynamic-versioning]).
+dynamic = ["version"]
+
+# https://pypi.org/classifiers/ — adjust as needed:
+classifiers = [
+    "Development Status :: 4 - Beta",
+    # "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    # Uncomment to make PyPI refuse a publish by accident:
+    # "Private :: Do Not Upload",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+observability = [
+    "structlog>=26.1.0",
+    "tqdm>=4.70.1",
+]
+
+[project.urls]
+Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
+# Homepage = "https://..."
+# Documentation = "https://..."
+
+[project.scripts]
+# Prefer the module name (snake_case); hyphens in a console script name can
+# break the generated .exe shim on Windows.
+{{ package_module }} = "{{ package_module }}:main"
+
+
+# ---- Dependency groups (PEP 735) ----
+# Installed by "uv sync" (dev is the default group) and by
+# "uv run <tool>" when the tool is missing. Extras are installed with
+# "uv sync --all-extras".
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
+    "pytest-sugar>=1.1.1",
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    "codespell>=2.4.3",
+    "pre-commit>=4.7.0",
+    "commitizen>=4.19.3",
+    "vulture>=2.16",
+    "rich>=15.0.0",
+    "funlog>=0.2.1",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.8.0",
+    "mkdocs-git-revision-date-localized-plugin>=1.6.3",
+]
+
+
+# ---- uv ----
+# uv needs no table of its own to work: `uv run <cmd>` uses the dev group, and
+# `uv sync --all-extras` adds the optional extras. Day-to-day shortcuts live in
+# the Makefile and in devtools/lint.py. If you want more, add them there.
+
+# ---- Build system ----
+# Version comes from git tags: https://github.com/ninoseki/uv-dynamic-versioning/ 
+# Keep both requirements pinned to the same version.
+
+[build-system]
+requires = ["hatchling>=1.33.0", "uv-dynamic-versioning[hatch]>=0.14.1"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+# JSON schemas for tool.hatch.version.source are incomplete, so IDEs may warn:
+# https://github.com/ninoseki/uv-dynamic-versioning/issues/21
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+# Release commits/tags are created by semantic-release (.releaserc.yml).
+bump = false
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{ package_module }}"]
+
+
+# ---- Ruff (lint + format) ----
+# https://docs.astral.sh/ruff/configuration/
+
+[tool.ruff]
+# Typically 88 (black standard) or 100 (wide).
+line-length = 100
+# Oldest Python in requires-python: lets ruff modernise code for it (UP rules).
+target-version = "py311"
+# Also lint docstring code blocks and notebooks once you have them:
+# extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+# Curated rule set from the Ruff docs, plus a few high-value families.
+# Full catalogue: https://docs.astral.sh/ruff/rules/
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort (import sorting)
+    "UP",      # pyupgrade
+    "B",       # flake8-bugbear
+    "C4",      # flake8-comprehensions
+    "SIM",     # flake8-simplify
+    "ARG",     # flake8-unused-arguments
+    "TCH",     # flake8-type-checking (move type-only imports behind TYPE_CHECKING)
+    "PTH",     # flake8-use-pathlib
+    "ERA",     # eradicate (commented-out code)
+    "PGH",     # pygrep-hooks (no blanket "# type: ignore" / "# noqa")
+    "RUF",     # ruff-specific
+    # "S",     # flake8-bandit (security) — noisy for libraries, see [tool.ruff.lint.flake8-bandit]
+    # "D",     # pydocstyle (docstrings) — enable once you write docstrings
+    # "N",     # pep8-naming
+    # "ANN",   # flake8-annotations (needs ty's ruff-era typing discipline)
+    # "PT",    # flake8-pytest-style
+    # "TRY",   # tryceratops
+]
+ignore = [
+    # Disabled on purpose (add/remove as desired):
+    "E501",    # https://docs.astral.sh/ruff/rules/line-too-long/ — the formatter owns line length
+    "E402",    # module-import-not-at-top-of-file — needed for sys.path/uv scripts
+    "E731",    # lambda-assignment — handy for short callbacks
+    # Always disable these when using ruff format + ruff check together:
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "W191", "E111", "E114", "E117",
+    "D206", "D300",
+    "Q000", "Q001", "Q002", "Q003",
+    "COM812", "COM819",
+    "ISC001", "ISC002",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests often need "unused" fixture arguments and assert inside helpers.
+"tests/**" = ["ARG001", "ARG002", "S101", "B018"]
+# An __init__.py re-exporting a public API looks like unused imports.
+"src/**/__init__.py" = ["F401"]
+# Scripts are thin wrappers around argparse.
+"scripts/**" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["{{ package_module }}"]
+combine-as-imports = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+
+# ---- ty (type checking) ----
+# https://docs.astral.sh/ty/configuration/
+
+[tool.ty.environment]
+# Keep in sync with requires-python above; ty would otherwise infer it, but
+# being explicit keeps editors and CI on the same target.
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["src", "tests", "devtools", "scripts"]
+
+[tool.ty.rules]
+# ty is pre-1.0 and some rules are noisy; demote here instead of ignoring whole
+# files. `uv run ty check --output-format concise` lists every diagnostic code.
+unused-ignore-comment = "warn"
+
+# Unresolved third-party imports are an environment problem, not a code problem.
+# If a dependency ships no stubs or py.typed marker, allow it explicitly:
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["untyped_package.**"]
+
+# ---- codespell ----
+# https://github.com/codespell-project/codespell
+
+[tool.codespell]
+skip = "*.lock,uv.lock,.git,dist,site,htmlcov,outputs"
+# ignore-words-list = "foo,bar"
+
+
+# ---- pytest ----
+# https://docs.pytest.org/en/stable/reference/reference.html#configuration-options
+
+[tool.pytest.ini_options]
+python_files = ["*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+# src/ layout: make the package importable without installing it first.
+pythonpath = ["src"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+# Treat warnings from your own code as errors; third-party noise stays a warning.
+filterwarnings = [
+    "default",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: touches the network, disk, or another process",
+]
+
+
+# ---- coverage ----
+# https://coverage.readthedocs.io/en/stable/config.html
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+relative_files = true
+
+[tool.coverage.paths]
+# Merge coverage produced in different places (local, CI, containers).
+source = [
+    "src/",
+    "*/site-packages/",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "def __repr__",
+    "@(typing\\.)?overload",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.",
+]
+# Raise this as the project matures (placeholder tests start near 0%):
+# fail_under = 80
+
+
+# ---- Commitizen (Conventional Commits helper) ----
+# https://commitizen-tools.github.io/commitizen/config/
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_provider = "scm"
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+
+
+# ---- vulture (dead code) ----
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src", "tests", "devtools", "scripts"]
+ignore_names = ["main"]
+# exclude = ["*/migrations/*"]
+
+================================================================================
+FILE: template/scripts/__init__.py
+================================================================================
+# Repo scripts package.
+
+================================================================================
+FILE: template/scripts/_lib/__init__.py
+================================================================================
+# Shared helpers for repo scripts.
+
+================================================================================
+FILE: template/scripts/_lib/bootstrap.py
+================================================================================
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ENV = REPO_ROOT / ".env"
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
+def resolve_path(path: str | Path) -> Path:
+    """Turn a repo-relative path into an absolute path under REPO_ROOT."""
+    p = Path(path).expanduser()
+    return p if p.is_absolute() else REPO_ROOT / p
+
+
+def load_env(path: Path | None = None) -> None:
+    """Load KEY=VALUE pairs from .env into os.environ (no overwrite)."""
+    env_path = path or DEFAULT_ENV
+    if not env_path.is_file():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if value and value[0] in "\"'" and value[-1] == value[0]:
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+================================================================================
+FILE: template/scripts/_lib/chosen_file_sync.py
+================================================================================
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from scripts._lib.bootstrap import REPO_ROOT, resolve_path
+from scripts._lib.outputs import write_output
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+CODE_SKIP_DIRS = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "build",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "outputs",
+        "bin",
+        "logs",
+        "script_logs",
+    }
+)
+DEFAULT_CODE_GLOBS = ("*.py",)
+
+
+@dataclass
+class SyncConfig:
+    """Watch files/directories and dump their contents to one text file."""
+
+    watch_roots: list[Path]
+    out_path: Path
+    interval: float = 2.0
+    mode: str = "code"
+    code_globs: tuple[str, ...] = DEFAULT_CODE_GLOBS
+    dedupe: bool = True
+    sort_longest: bool = False
+    include_header: bool = True
+
+
+@dataclass
+class SyncState:
+    snapshot: dict[str, tuple[float, int]] = field(default_factory=dict)
+    resolved_paths: list[Path] = field(default_factory=list)
+    last_line_count: int = 0
+
+
+def _should_skip(path: Path) -> bool:
+    return any(part in CODE_SKIP_DIRS for part in path.parts)
+
+
+def _repo_relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def discover_files(
+    roots: list[Path],
+    *,
+    code_globs: tuple[str, ...] = DEFAULT_CODE_GLOBS,
+) -> list[Path]:
+    """Expand files and directories into a sorted list of source files."""
+    discovered: set[Path] = set()
+
+    for root in roots:
+        resolved = resolve_path(root)
+        if resolved.is_file():
+            if not _should_skip(resolved):
+                discovered.add(resolved.resolve())
+            continue
+        if not resolved.is_dir():
+            continue
+        for pattern in code_globs:
+            for match in resolved.rglob(pattern):
+                if match.is_file() and not _should_skip(match):
+                    discovered.add(match.resolve())
+
+    return sorted(discovered)
+
+
+def resolve_watch_roots(
+    paths: list[str | Path],
+    *,
+    dirs: list[str | Path] | None = None,
+    file_list: str | Path | None = None,
+) -> list[Path]:
+    roots: list[Path] = []
+    seen: set[Path] = set()
+
+    def add(raw: str | Path) -> None:
+        path = resolve_path(raw)
+        key = path.resolve() if path.exists() else path
+        if key not in seen:
+            seen.add(key)
+            roots.append(path)
+
+    if file_list:
+        list_path = resolve_path(file_list)
+        if not list_path.is_file():
+            raise SystemExit(f"File list not found: {list_path}")
+        for raw in list_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line and not line.startswith("#"):
+                add(line)
+
+    for raw in paths:
+        add(raw)
+
+    for raw in dirs or []:
+        add(raw)
+
+    if not roots:
+        raise SystemExit("No inputs. Pass file/dir paths, --dir, and/or --file-list.")
+    return roots
+
+
+def _read_plain_lines(path: Path) -> list[str]:
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def read_file_lines(path: Path, mode: str) -> list[str]:
+    if not path.is_file():
+        return []
+    if mode in {"code", "concat"}:
+        text = path.read_text(encoding="utf-8")
+        return [text] if text else []
+    return _read_plain_lines(path)
+
+
+def collect_lines(paths: list[Path], config: SyncConfig) -> list[str]:
+    collected: list[str] = []
+    for path in paths:
+        collected.extend(read_file_lines(path, config.mode))
+
+    if config.dedupe:
+        seen: set[str] = set()
+        unique: list[str] = []
+        for line in collected:
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(line)
+        collected = unique
+
+    if config.sort_longest:
+        collected.sort(key=lambda line: (-len(line), line.lower()))
+    else:
+        collected.sort(key=str.lower)
+
+    return collected
+
+
+def build_code_output(paths: list[Path], *, include_header: bool) -> str:
+    blocks: list[str] = []
+    if include_header:
+        blocks.append(
+            "\n".join(
+                [
+                    "# synced source dump",
+                    f"# files: {len(paths)}",
+                    "",
+                ]
+            )
+        )
+
+    for path in paths:
+        if not path.is_file():
+            continue
+        rel = _repo_relative(path)
+        body = path.read_text(encoding="utf-8").rstrip()
+        blocks.append(f"{'=' * 80}\nFILE: {rel}\n{'=' * 80}\n{body}\n")
+    return "\n".join(blocks).rstrip() + ("\n" if blocks else "")
+
+
+def build_output(paths: list[Path], config: SyncConfig) -> str:
+    if config.mode == "code":
+        return build_code_output(paths, include_header=config.include_header)
+    if config.mode == "concat":
+        blocks: list[str] = []
+        for path in paths:
+            if not path.is_file():
+                continue
+            body = path.read_text(encoding="utf-8")
+            blocks.append(f"=== {_repo_relative(path)} ===\n{body.rstrip()}\n")
+        return "\n".join(blocks).rstrip() + ("\n" if blocks else "")
+
+    lines = collect_lines(paths, config)
+    if config.include_header:
+        header = [
+            f"# synced from {len(paths)} file(s)",
+            *(f"#   - {_repo_relative(path)}" for path in paths),
+            "",
+        ]
+        return "\n".join(header + lines) + ("\n" if lines or header else "")
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def snapshot_paths(paths: list[Path]) -> dict[str, tuple[float, int]]:
+    state: dict[str, tuple[float, int]] = {}
+    for path in paths:
+        if path.is_file():
+            stat = path.stat()
+            state[str(path)] = (stat.st_mtime, stat.st_size)
+    return state
+
+
+def snapshot_changed(
+    previous: dict[str, tuple[float, int]], current: dict[str, tuple[float, int]]
+) -> bool:
+    if set(current) != set(previous):
+        return True
+    return any(current[key] != previous.get(key) for key in current)
+
+
+def resolve_paths_for_sync(config: SyncConfig) -> list[Path]:
+    if config.mode in {"code", "concat"}:
+        return discover_files(config.watch_roots, code_globs=config.code_globs)
+    files: list[Path] = []
+    for root in config.watch_roots:
+        resolved = resolve_path(root)
+        if resolved.is_file():
+            files.append(resolved.resolve())
+    return sorted(set(files))
+
+
+def sync_once(config: SyncConfig, state: SyncState, *, force: bool = False) -> bool:
+    paths = resolve_paths_for_sync(config)
+    current = snapshot_paths(paths)
+    if not force and not snapshot_changed(state.snapshot, current):
+        return False
+
+    content = build_output(paths, config)
+    write_output(config.out_path, content, newline=False)
+    state.snapshot = current
+    state.resolved_paths = paths
+    state.last_line_count = content.count("\n") if content else 0
+    return True
+
+
+def run_watch(config: SyncConfig) -> int:
+    state = SyncState()
+    sync_once(config, state, force=True)
+    print(f"syncing {len(state.resolved_paths)} source file(s) -> {config.out_path}")
+    print(f"mode={config.mode} interval={config.interval}s (Ctrl+C to stop)")
+    print(f"initial write: {state.last_line_count} lines")
+
+    try:
+        while True:
+            time.sleep(config.interval)
+            if sync_once(config, state):
+                print(f"updated: {len(state.resolved_paths)} files, {state.last_line_count} lines")
+    except KeyboardInterrupt:
+        print("\nstopped")
+        return 0
+
+================================================================================
+FILE: template/scripts/_lib/outputs.py
+================================================================================
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, Any
+
+from scripts._lib.bootstrap import resolve_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+OUTPUTS_DIR = resolve_path("outputs")
+BUILDS_DIR = OUTPUTS_DIR / "builds"
+
+
+def output_dir(path: str | Path) -> Path:
+    """Resolve a directory path and create it."""
+    resolved = resolve_path(path)
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
+
+
+def output_path(path: str | Path) -> Path:
+    """Resolve a repo-relative path and create parent directories."""
+    resolved = resolve_path(path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    return resolved
+
+
+def write_output(
+    path: str | Path,
+    content: str | dict[str, Any] | list[Any],
+    *,
+    indent: int = 2,
+    newline: bool = True,
+) -> Path:
+    """Write text or JSON to a file under the repo. Returns the resolved path."""
+    out = output_path(path)
+    if isinstance(content, (dict, list)):
+        text = json.dumps(content, ensure_ascii=False, indent=indent) + "\n"
+    elif newline and content and not content.endswith("\n"):
+        text = content + "\n"
+    else:
+        text = content
+    out.write_text(text, encoding="utf-8")
+    return out.resolve()
+
+================================================================================
+FILE: template/scripts/chosen_files.txt.jinja
+================================================================================
+# One path per line (files or directories). Lines starting with # are ignored.
+src/{{ package_module }}
+
+================================================================================
+FILE: template/scripts/sync_chosen_files.py
+================================================================================
+#!/usr/bin/env python3
+"""Watch source files and dump them to one text file.
+
+Usage:
+  uv run sync-chosen-files
+  uv run sync-chosen-files --once
+  uv run sync-chosen-files src/my_package
+  uv run sync-chosen-files --dir src/my_package --dir scripts
+  uv run sync-chosen-files --file-list scripts/chosen_files.txt
+  uv run sync-chosen-files --ext py,toml --once
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts._lib.bootstrap import load_env, resolve_path
+from scripts._lib.chosen_file_sync import SyncConfig, resolve_watch_roots, run_watch
+
+DEFAULT_FILE_LIST = "scripts/chosen_files.txt"
+DEFAULT_CODE_OUT = "outputs/builds/source_dump.txt"
+
+
+def main() -> int:
+    load_env()
+
+    ap = argparse.ArgumentParser(description="Sync chosen source files into one text dump.")
+    ap.add_argument(
+        "paths",
+        nargs="*",
+        default=None,
+        help="Files or directories to watch (default: scripts/chosen_files.txt)",
+    )
+    ap.add_argument(
+        "--dir",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Directory to watch recursively (repeatable)",
+    )
+    ap.add_argument(
+        "--file-list",
+        default=None,
+        help=f"Text file with one path per line (default: {DEFAULT_FILE_LIST})",
+    )
+    ap.add_argument(
+        "--out",
+        default=DEFAULT_CODE_OUT,
+        help=f"Output text file (default: {DEFAULT_CODE_OUT})",
+    )
+    ap.add_argument(
+        "--mode",
+        choices=("code", "concat", "lines"),
+        default="code",
+        help="code=full source dump (default), concat=raw bodies, lines=line dump",
+    )
+    ap.add_argument(
+        "--ext",
+        default="py",
+        help="Comma-separated extensions for code/concat directory scan (default: py)",
+    )
+    ap.add_argument(
+        "--interval",
+        type=float,
+        default=2.0,
+        help="Poll interval in seconds (default: 2)",
+    )
+    ap.add_argument(
+        "--no-dedupe",
+        action="store_true",
+        help="Keep duplicate lines (lines mode only)",
+    )
+    ap.add_argument(
+        "--sort-longest",
+        action="store_true",
+        help="Sort output longest-first (lines mode only)",
+    )
+    ap.add_argument(
+        "--no-header",
+        action="store_true",
+        help="Omit header block from output",
+    )
+    ap.add_argument(
+        "--once",
+        action="store_true",
+        help="Write one dump and exit (default: watch and re-sync)",
+    )
+    args = ap.parse_args()
+
+    code_globs = tuple(f"*.{ext.strip().lstrip('.')}" for ext in args.ext.split(",") if ext.strip())
+    file_list = args.file_list
+    if args.paths:
+        watch_paths = args.paths
+    elif file_list:
+        watch_paths = []
+    elif args.dir:
+        watch_paths = []
+        file_list = None
+    else:
+        watch_paths = []
+        file_list = DEFAULT_FILE_LIST
+
+    watch_roots = resolve_watch_roots(watch_paths, dirs=args.dir, file_list=file_list)
+
+    missing = [path for path in watch_roots if not path.exists()]
+    for path in missing:
+        print(f"warning: not found yet (will watch for it): {path}")
+
+    config = SyncConfig(
+        watch_roots=watch_roots,
+        out_path=resolve_path(args.out),
+        interval=args.interval,
+        mode=args.mode,
+        code_globs=code_globs or ("*.py",),
+        dedupe=not args.no_dedupe,
+        sort_longest=args.sort_longest,
+        include_header=not args.no_header,
+    )
+    if args.once:
+        from scripts._lib.chosen_file_sync import SyncState, sync_once
+
+        state = SyncState()
+        sync_once(config, state, force=True)
+        print(
+            f"wrote {state.last_line_count} lines from {len(state.resolved_paths)} "
+            f"file(s) -> {config.out_path}"
+        )
+        return 0
+    return run_watch(config)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+================================================================================
+FILE: template/src/{{ package_module }}/__init__.py.jinja
+================================================================================
+"""{{ package_name }}: {{ package_description }}."""
+
+from __future__ import annotations
+
+__version__ = "0.0.0"  # Overwritten by uv-dynamic-versioning when built.
+
+__all__ = ["__version__"]
+
+# Re-export your public API from here (e.g. `from .core import Client`) and add
+# each name to __all__. Avoid wildcard imports: they break static analysis.
+
+================================================================================
+FILE: template/src/{{ package_module }}/py.typed
+================================================================================
+
+
+================================================================================
+FILE: template/src/{{ package_module }}/{{ package_module }}.py
+================================================================================
+# TODO: Add code!
+def main() -> None:
+    pass
+
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
+FILE: template/tests/test_placeholder.py
+================================================================================
+# Placeholder for an empty build.
+def test_placeholder():
+    assert True
+
+================================================================================
+FILE: template/{{_copier_conf.answers_file}}.jinja
+================================================================================
+# Changes here will be overwritten by Copier. Do not edit manually.
+{{ _copier_answers|to_nice_yaml -}}
+
+================================================================================
+FILE: .gitignore
+================================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# UV
+#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#uv.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+#poetry.toml
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
+#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
+#pdm.lock
+#pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
+#pixi.lock
+#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
+#   in the .venv directory. It is recommended not to include this directory in version control.
+.pixi
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+# Abstra
+# Abstra is an AI-powered process automation framework.
+# Ignore directories containing user credentials, local state, and settings.
+# Learn more at https://abstra.io/docs
+.abstra/
+
+# Visual Studio Code
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
+#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  you could uncomment the following to ignore the entire vscode folder
+# .vscode/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Cursor
+#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
+#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
+#  refer to https://docs.cursor.com/context/ignore-files
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+# Scratch output from repo_check.py and local tool runs
+.template-check/
+pytest-cache-files-*/
+
+================================================================================
+FILE: LICENSE
+================================================================================
+MIT License
+
+Copyright (c) 2026 MFDI-hub
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+FILE: README.md
+================================================================================
+# python-template
+
+A [Copier](https://copier.readthedocs.io/) template for Python libraries and apps with a
+modern, [`uv`](https://docs.astral.sh/uv/)-first workflow, [Ruff](https://docs.astral.sh/ruff/),
+and [ty](https://docs.astral.sh/ty/) type checking.
+
+## Quickstart
+
+### 1) Install tools
+
+Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) first.
+Then run Copier through `uvx` (no global install required). Nothing else is needed:
+`uv sync` inside the generated project provides Python and every tool.
+
+### 2) Generate a project
+
+Into a new folder:
+
+```shell
+uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template my-package
+cd my-package
+```
+
+Into the current folder (for example an empty git repo you already created on GitHub):
+
+```shell
+uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template .
+```
+
+### 3) Start developing
+
+```shell
+uv sync --all-extras
+uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
+uv run pytest -n auto --cov   # or: make install && make
+```
+
+> **Why `--vcs-ref HEAD`?** Copier reads the template's tags with `git ls-remote`. If no
+> `vX.Y.Z` tag exists yet it falls back to HEAD — but the `git` call can still fail on
+> machines where Git cannot reach the template (offline, corporate proxy, SSH prompts).
+> Passing `--vcs-ref HEAD` makes Copier skip tag resolution entirely and use the latest
+> main. Once this template publishes a release tag, you can drop the flag.
+
+Copier prompts if a file already exists (`.gitignore` is a common conflict). Answer
+`Yes` to overwrite or `No` to keep it. Do not run `copier copy` inside this
+`python-template` source repo itself.
+
+## Updating an existing project from the template
+
+```shell
+uvx copier update --vcs-ref HEAD
+```
+
+The working tree must be clean first. Your answers are re-used; conflicts are written
+into the files and must be resolved and committed.
+
+## Working on this template
+
+This repo is itself a small Python project, so templates are checked before they ship:
+
+```shell
+uv sync
+uv run ruff check .          # lint this repo's tooling
+uv run pytest                # tests for the repo tooling
+python repo_check.py         # render the template + verify every generated file
+```
+
+## Scaffolded project includes
+
+### Core
+
+- **uv** — env, lockfile, `uv run`, `uv build`, `uv publish`
+- **Copier** — generate/update from this template
+- **Hatchling** + **uv-dynamic-versioning** — build, version from git tags
+- **Ruff** — lint + format (single tool, single config in `pyproject.toml`)
+- **ty** — type checking (`[tool.ty]` in `pyproject.toml`)
+- **pytest** + **pytest-cov** + **pytest-xdist** — tests, coverage, parallelism
+- **MkDocs** + **Material for MkDocs** — docs
+- **Makefile** — `install`, `lint`, `test`, `docs`, `build`, `clean`, `upgrade`
+- **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, pip-audit) and PyPI publish (OIDC)
+
+### Quality & testing
+
+- **pre-commit** — git hooks (ruff, codespell, ty, vulture, commitizen)
+- **codespell** — spelling
+- **vulture** — dead code detection
+- **commitizen** — Conventional Commits (`uv run cz commit`)
+
+### Security & deps
+
+- **Dependabot** — weekly updates for Actions and Python dependencies
+- **Trivy** — filesystem scan in CI
+- **pip-audit** — vulnerability audit of locked runtime dependencies
+
+### Release & docs hosting
+
+- **semantic-release** — GitHub Releases from Conventional Commits
+- **Read the Docs** and **GitHub Pages** configs
+
+### DevEx
+
+- **.python-version** — pins the default interpreter for `uv`
+- **devcontainer.json** — Codespaces / VS Code Dev Containers
+- **VS Code tasks + settings** — ruff format on save, ty, `install`/`lint`/`test` tasks
+- **Optional extras** — `structlog` + `tqdm` via `uv sync --extra observability`
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+================================================================================
+FILE: copier.yml
+================================================================================
+# Copier configuration for https://github.com/MFDI-hub/python-template
+# Docs: https://copier.readthedocs.io/
+
+_min_copier_version: "9.4.0"
+_subdirectory: template
+# Generated projects start as a git repo with one "Initial template commit".
+_tasks:
+  - "git init --quiet"
+  - "git add -A"
+  - 'git commit --quiet -m "chore: initial commit from MFDI-hub/python-template" --no-verify'
+
+_message_after_copy: |
+  Copied successfully! Next steps:
+
+    cd PROJECT  # skip if you copied into `.`
+    uv sync --all-extras          # creates .venv and uv.lock
+    uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
+    uv run pytest -n auto --cov   # or: make install && make
+
+  Before publishing, search for unfilled `changeme` strings and confirm the
+  metadata in pyproject.toml (name, description, author, URLs, license).
+  This template ships the MIT license; see the `license` field and LICENSE.
+
+  Then create the GitHub repo and push:
+
+    git remote add origin git@github.com:OWNER/PROJECT.git
+    git branch -M main
+    git push -u origin main
+
+  Releases: commit with Conventional Commits (`uv run cz commit`) and
+  semantic-release tags + publishes for you. See docs/publishing.md.
+
+# ---- Questions ----
+
+package_name:
+    type: str
+    help: Package name? (GitHub repo + PyPI name, e.g. CamelCase, dash-case or snake_case. Only required field.)
+    default: changeme
+
+package_module:
+    type: str
+    help: Python module name? (snake_case; imported as `import <package_module>`. Press enter to derive it from the package name.)
+    default: "{{ package_name | lower | replace('-', '_') | replace('.', '_') }}"
+    validator: >-
+        {% if not package_module.isidentifier() %}Must be a valid Python identifier: snake_case, no hyphens or spaces.{% endif %}
+        {% if package_module != package_module | lower %}Must be lowercase; PyPI project names are case-insensitive, module names are not.{% endif %}
+
+package_description:
+    type: str
+    help: One-line package description? (Shown on PyPI and in docs. Press enter to fill in later.)
+    default: changeme
+
+package_author_name:
+    type: str
+    help: Package author name? (Press enter to fill in later.)
+    default: changeme
+
+package_author_email:
+    type: str
+    help: Package author email? (Press enter to fill in later.)
+    default: changeme@example.com
+
+package_github_org:
+    type: str
+    help: GitHub org or username that will host the repo? (Press enter to fill in later.)
+    default: changeme
+
+copyright_year:
+    type: str
+    help: Copyright year for the LICENSE?
+    default: "2026"
+
+================================================================================
+FILE: pyproject.toml
+================================================================================
+# Repo config for the Copier template itself (NOT rendered into generated projects).
+# The project pyproject that users get lives in template/pyproject.toml.jinja.
+#
+# Everything in [dependency-groups].dev is needed to develop, lint, test, and
+# release this template. Generated projects get their own (larger) dev group.
+
+[project]
+name = "python-template"
+version = "0.1.0"
+description = "A Copier template for Python libraries/projects."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/MFDI-hub/python-template"
+
+[dependency-groups]
+dev = [
+    # Template engine + rendering.
+    "copier>=9.19.1",
+    # Lint/format/type-check this repo's own tooling and tests. The template
+    # itself is checked after rendering, by the generated project's config.
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    # Tests for the repo tooling and the template's cross-file contracts.
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    # Dead-code check over the repo tooling ([tool.vulture] below).
+    "vulture>=2.16",
+]
+
+[tool.ruff]
+# Keep in sync with template/pyproject.toml.jinja.
+line-length = 100
+target-version = "py311"
+# template/ holds Jinja files, so it is checked where it actually counts: the
+# rendered project is linted in CI (see repo_check.py), not the raw templates.
+extend-exclude = [
+    ".template-check",
+    "outputs",
+    "site",
+    "template",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", # pycodestyle
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+    "PGH",    # pygrep-hooks (blanket noqa / blanket type: ignore)
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line length is handled by the formatter
+    "B008",   # function calls in argument defaults (e.g. typer.Option())
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts", "devtools"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally have unused arguments (fixtures) and assert outside pytest.raises.
+"test*.py" = ["ARG001", "ARG002", "S101"]
+"conftest.py" = ["ARG001"]
+
+[tool.ty.environment]
+# Keep in sync with template/pyproject.toml.jinja.
+python-version = "3.11"
+
+[tool.ty.rules]
+unused-ignore-comment = "warn"
+
+[tool.pytest.ini_options]
+testpaths = ["template_tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+
+[tool.coverage.run]
+branch = true
+source = ["template_tests"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.vulture]
+min_confidence = 80
+paths = ["template_tests"]
+
+================================================================================
+FILE: repo_check.py
+================================================================================
+"""Render this Copier template and verify the generated project.
+
+Usage:  uv run --with copier python repo_check.py [--keep DIR]
+
+This repository ships Jinja templates, so ordinary lint and tests only ever
+see .jinja text. This gate renders the template for a couple of common answer
+sets and validates what a user actually receives:
+
+  * every file renders and keeps no leftover "{{" / "{%" tokens
+  * the generated pyproject.toml parses and carries the promised config
+  * GitHub Actions ${{ }} expressions in copied workflows survive intact
+  * JSON files (VS Code, devcontainer) parse after comments are stripped
+
+The template is copied to a scratch directory *without* its git metadata before
+rendering, so Copier never clones the repo or resolves refs. That keeps the
+gate hermetic: it verifies the working tree, including uncommitted edits.
+
+Stdlib only: the caller supplies copier (e.g. uv run --with copier).
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+ROOT = Path(__file__).resolve().parent
+
+# Copier renders this file with {{ }} placeholders by design.
+_SKIP_RENDER_CHECK = {".copier-answers.yml"}
+
+# GitHub Actions expressions live only in the workflows, which are copied as-is.
+_GHA_EXPR = re.compile(r"\$\{\{[^}]*\}\}")
+
+
+@dataclass(frozen=True)
+class Answers:
+    """One answer set to render the template with."""
+
+    label: str
+    package_name: str
+    package_module: str
+
+
+ANSWER_SETS = (
+    Answers("dash-name", "demo-pkg", "demo_pkg"),
+    Answers("snake-name", "demo_pkg", "demo_pkg"),
+)
+
+# Paths every generated project must contain; {m} is the module name.
+REQUIRED_FILES = (
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+    "Makefile",
+    "mkdocs.yml",
+    ".pre-commit-config.yaml",
+    ".python-version",
+    ".gitignore",
+    ".copier-answers.yml",
+    "src/{m}/__init__.py",
+    "src/{m}/py.typed",
+    "tests/test_placeholder.py",
+    "devtools/lint.py",
+    "docs/development.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/publish.yml",
+    ".vscode/settings.json",
+    ".devcontainer/devcontainer.json",
+)
+
+
+def remove_tree(path: Path) -> None:
+    """Delete a tree, coping with the read-only files git writes.
+
+    Git writes pack files and objects read-only, and on Windows `shutil.rmtree`
+    cannot unlink those. Clear the write bit on each failing entry and retry.
+    Anything still locked is left behind rather than raised: a stray scratch
+    directory must not turn a passing verification into a stack trace.
+    """
+
+    def _on_error(func, target, _exc):
+        with contextlib.suppress(OSError):
+            Path(target).chmod(stat.S_IWRITE | stat.S_IREAD)
+        with contextlib.suppress(OSError):
+            func(target)
+
+    kwargs = {"onexc": _on_error} if sys.version_info >= (3, 12) else {"onerror": _on_error}
+    shutil.rmtree(path, **kwargs)
+
+
+class CheckFailed(Exception):
+    """A rendered project does not satisfy the template contract."""
+
+
+def stage_template(dest: Path) -> Path:
+    """Extract copier.yml and template/ into dest, without git metadata.
+
+    Copier treats a local directory as a VCS template only when it *is* a git
+    work tree; a plain directory is rendered in place. Taking the files from
+    the git index also means new template files must be staged (`git add`, as
+    the tests do) before they can ship, and build artifacts never leak in.
+    """
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "-z"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if listed.returncode != 0:
+        raise CheckFailed(f"git ls-files failed (is this a git repo?): {listed.stderr.strip()}")
+
+    selected = [
+        name
+        for name in listed.stdout.split("\0")
+        if name == "copier.yml" or name.startswith("template/")
+    ]
+    if not selected:
+        raise CheckFailed("no template files found in the git index; run git add first")
+
+    for name in selected:
+        blob = subprocess.run(
+            ["git", "show", f":{name}"],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        )
+        out = dest / name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(blob.stdout)
+    return dest
+
+
+def render(staged: Path, answers: Answers, dest: Path) -> None:
+    """Render the staged template into dest with the copier CLI."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "copier",
+        "copy",
+        "--defaults",
+        "--quiet",
+        # Required because copier.yml declares _tasks (git init + commit).
+        "--trust",
+        "-d",
+        f"package_name={answers.package_name}",
+        "-d",
+        f"package_module={answers.package_module}",
+        "-d",
+        "package_description=Demo package for template verification.",
+        "-d",
+        "package_author_name=Demo Author",
+        "-d",
+        "package_author_email=demo@example.com",
+        "-d",
+        "package_github_org=demo-org",
+        "-d",
+        "copyright_year=2026",
+        str(staged),
+        str(dest),
+    ]
+    result = subprocess.run(cmd, text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        tail = (result.stdout + result.stderr).strip().splitlines()[-15:]
+        raise CheckFailed("copier copy failed:\n" + "\n".join(tail))
+
+
+def module_of(dest: Path) -> str:
+    """Return the module name from the single directory generated under src/."""
+    modules = [p.name for p in (dest / "src").iterdir() if p.is_dir()]
+    if len(modules) != 1:
+        raise CheckFailed(f"expected one module under src/, found {modules}")
+    return modules[0]
+
+
+def check_files_exist(dest: Path, _answers: Answers) -> None:
+    """Files users rely on must actually be generated."""
+    module = module_of(dest)
+    missing = [p for p in REQUIRED_FILES if not (dest / p.format(m=module)).exists()]
+    if missing:
+        raise CheckFailed(f"missing generated files: {missing}")
+
+
+def check_no_jinja_leftovers(dest: Path, _answers: Answers) -> None:
+    """Rendered files must be free of Jinja syntax Copier failed to process."""
+    problems: list[str] = []
+    for path in sorted(dest.rglob("*")):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        rel = path.relative_to(dest)
+        if rel.as_posix() in _SKIP_RENDER_CHECK:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "{{" not in text and "{%" not in text:
+            continue
+        # Workflows are copied verbatim, so their ${{ matrix.x }} is expected.
+        if rel.parts[:2] == (".github", "workflows"):
+            text = _GHA_EXPR.sub("", text)
+        if "{{" in text or "{%" in text:
+            problems.append(rel.as_posix())
+    if problems:
+        raise CheckFailed(f"unrendered Jinja syntax in: {problems}")
+
+
+def check_pyproject(dest: Path, _answers: Answers) -> None:
+    """The generated pyproject.toml must be valid and carry the promised config."""
+    data = tomllib.loads((dest / "pyproject.toml").read_text(encoding="utf-8"))
+    project = data["project"]
+    module = module_of(dest)
+
+    if project["license"] != "MIT":
+        raise CheckFailed("project.license should be the SPDX string 'MIT'")
+    if project["requires-python"] != ">=3.11":
+        raise CheckFailed(f"unexpected requires-python: {project['requires-python']}")
+    if project.get("dynamic") != ["version"]:
+        raise CheckFailed("project.dynamic must be ['version']")
+    if project["scripts"].get(module) != f"{module}:main":
+        raise CheckFailed(f"console script for {module} is wrong: {project['scripts']}")
+
+    dev = [d.lower() for d in data["dependency-groups"]["dev"]]
+    for tool in ("ruff", "ty", "pytest", "codespell", "pre-commit", "vulture"):
+        if not any(d.startswith(tool) for d in dev):
+            raise CheckFailed(f"dev dependency group is missing {tool}")
+
+    ruff = data["tool"]["ruff"]
+    if "line-length" not in ruff or "target-version" not in ruff:
+        raise CheckFailed("[tool.ruff] needs line-length and target-version")
+    if not ruff["lint"]["select"]:
+        raise CheckFailed("[tool.ruff.lint] select must not be empty")
+    ty_python = data["tool"].get("ty", {}).get("environment", {}).get("python-version")
+    if ty_python != "3.11":
+        # ty's schema puts python-version under [tool.ty.environment], not [tool.ty].
+        raise CheckFailed(
+            f"[tool.ty.environment] python-version must match requires-python, got {ty_python!r}"
+        )
+    if data["tool"]["pytest"]["ini_options"]["testpaths"] != ["tests"]:
+        raise CheckFailed("[tool.pytest.ini_options] testpaths must be ['tests']")
+
+    if not any("uv-dynamic-versioning" in req for req in data["build-system"]["requires"]):
+        raise CheckFailed("build-system requires uv-dynamic-versioning")
+
+    _check_uv_accepts(dest)
+
+
+def _check_uv_accepts(dest: Path) -> None:
+    """Ask uv to parse pyproject.toml so invalid [tool.uv] values fail the gate.
+
+    `tomllib` proves the TOML is well formed, not that uv understands it; a bad
+    enum like add-bounds = ">=lower" otherwise only shows up on a user's first
+    `uv sync`, as a warning that every tool reading the file then repeats.
+    """
+    if shutil.which("uv") is None:
+        return  # uv is optional for this repo; CI installs it via setup-uv.
+    result = subprocess.run(
+        ["uv", "lock", "--offline", "--quiet"],
+        cwd=dest,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if "unknown variant" in result.stderr or "invalid" in result.stderr.lower():
+        raise CheckFailed(f"uv rejects pyproject.toml: {result.stderr.strip()[:400]}")
+
+
+def check_workflows(dest: Path, _answers: Answers) -> None:
+    """GitHub Actions expressions must survive the copy untouched."""
+    ci = (dest / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    for expr in ("${{ matrix.os }}", "${{ matrix.python-version }}"):
+        if expr not in ci:
+            raise CheckFailed(f"ci.yml lost the GitHub Actions expression {expr}")
+    if 'python-version: ["3.10"' in ci:
+        raise CheckFailed("ci.yml still tests 3.10 while requires-python is >=3.11")
+
+
+def strip_jsonc(text: str) -> str:
+    """Remove // and /* */ comments that sit outside of string literals."""
+    out: list[str] = []
+    i = 0
+    in_string = False
+    while i < len(text):
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if ch == "\\" and i + 1 < len(text):
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == '"':
+                in_string = False
+            i += 1
+        elif ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+        elif text.startswith("//", i):
+            while i < len(text) and text[i] != "\n":
+                i += 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            i = len(text) if end == -1 else end + 2
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+def check_json_files(dest: Path, _answers: Answers) -> None:
+    """Editor and devcontainer JSON must parse comments stripped."""
+    for rel in (".vscode/settings.json", ".vscode/tasks.json", ".devcontainer/devcontainer.json"):
+        text = (dest / rel).read_text(encoding="utf-8")
+        try:
+            json.loads(strip_jsonc(text))
+        except json.JSONDecodeError as exc:
+            raise CheckFailed(f"{rel} is not valid JSON: {exc}") from exc
+
+
+CHECKS: tuple[Callable[[Path, Answers], None], ...] = (
+    check_files_exist,
+    check_no_jinja_leftovers,
+    check_pyproject,
+    check_workflows,
+    check_json_files,
+)
+
+
+def verify(dest: Path, answers: Answers) -> None:
+    """Run every structural check against one rendered project."""
+    for check in CHECKS:
+        check(dest, answers)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Render every answer set, verify it, and report."""
+    parser = argparse.ArgumentParser(description="Render and verify the Copier template.")
+    parser.add_argument("--keep", metavar="DIR", help="render into DIR and keep the output")
+    args = parser.parse_args(argv)
+
+    failures = 0
+    # A plain, uniquely named directory inside the project: mkdtemp() can create
+    # directories that Windows then refuses to write into under restrictive ACLs.
+    workdir = ROOT / ".template-check" / f"run-{os.getpid()}"
+    remove_tree(workdir)
+    workdir.mkdir(parents=True)
+    try:
+        staged = stage_template(workdir / "template")
+        for answers in ANSWER_SETS:
+            target = Path(args.keep) / answers.label if args.keep else workdir / answers.label
+            try:
+                render(staged, answers, target)
+                verify(target, answers)
+            except CheckFailed as exc:
+                failures += 1
+                print(f"[FAIL] {answers.label}: {exc}", file=sys.stderr)
+                if args.keep:
+                    print(f"       kept rendered project at {target}", file=sys.stderr)
+            else:
+                print(f"[ok] {answers.label}: rendered and verified")
+    finally:
+        if not args.keep:
+            remove_tree(workdir)
+            if not workdir.exists():  # keep the repo tidy
+                with contextlib.suppress(OSError):
+                    workdir.parent.rmdir()
+
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+================================================================================
+FILE: template_tests/test_repo_check.py
+================================================================================
+"""Tests for the repo tooling (not shipped to generated projects)."""
+
+from __future__ import annotations
+
+import shutil
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+# repo_check.py lives at the repo root, outside this test package.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import repo_check
+from repo_check import Answers, CheckFailed, strip_jsonc
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+
+def test_strip_jsonc_removes_line_comments() -> None:
+    text = '{\n  // comment\n  "a": 1\n}'
+    assert strip_jsonc(text) == '{\n  \n  "a": 1\n}'
+
+
+def test_strip_jsonc_keeps_comment_markers_inside_strings() -> None:
+    text = '{"url": "https://example.com//x", "glob": "/*not a comment*/"}'
+    assert strip_jsonc(text) == text
+
+
+def test_strip_jsonc_removes_block_comments() -> None:
+    assert strip_jsonc('{\n/* a\nb */\n"k": 2\n}') == '{\n\n"k": 2\n}'
+
+
+@pytest.fixture
+def scratch() -> Iterator[Path]:
+    """A throwaway tree inside the repo (CI temp dirs vary by platform)."""
+    root = Path(__file__).resolve().parent / "_scratch" / "module_of"
+    shutil.rmtree(root, ignore_errors=True)
+    root.mkdir(parents=True)
+    try:
+        yield root
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_module_of_reads_generated_module(scratch: Path) -> None:
+    (scratch / "src" / "demo_pkg").mkdir(parents=True)
+    assert repo_check.module_of(scratch) == "demo_pkg"
+
+
+def test_module_of_rejects_ambiguous_layout(scratch: Path) -> None:
+    (scratch / "src" / "a").mkdir(parents=True)
+    (scratch / "src" / "b").mkdir(parents=True)
+    with pytest.raises(CheckFailed, match="expected one module"):
+        repo_check.module_of(scratch)
+
+
+def test_answer_sets_are_distinct() -> None:
+    labels = [a.label for a in repo_check.ANSWER_SETS]
+    assert len(labels) == len(set(labels))
+    assert all(isinstance(a, Answers) for a in repo_check.ANSWER_SETS)
+
+================================================================================
+FILE: template_tests/test_template_contract.py
+================================================================================
+"""Guard the copier.yml contract that the repo depends on."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _copier_yml() -> str:
+    return (ROOT / "copier.yml").read_text(encoding="utf-8")
+
+
+def test_copier_yml_declares_required_questions() -> None:
+    text = _copier_yml()
+    for question in (
+        "package_name",
+        "package_module",
+        "package_description",
+        "package_author_name",
+        "package_author_email",
+        "package_github_org",
+        "copyright_year",
+    ):
+        assert re.search(rf"^{question}:", text, re.MULTILINE), question
+
+
+def test_package_module_default_has_no_hyphens() -> None:
+    text = _copier_yml()
+    default_line = next(
+        line
+        for line in text.splitlines()
+        if line.startswith("    default:") and "package_name" in line
+    )
+    assert "replace('-', '_')" in default_line
+
+
+def test_template_requires_same_python_as_repo() -> None:
+    pyproject = (ROOT / "template" / "pyproject.toml.jinja").read_text(encoding="utf-8")
+    repo = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    m = re.search(r'requires-python = ">=([0-9.]+)"', pyproject)
+    assert m is not None, "template pyproject must pin requires-python"
+    minor = m.group(1)
+    assert f'python-version = "{minor}"' in pyproject, "ty/ruff python-version must match"
+    assert f'target-version = "py{minor.replace(".", "")}"' in pyproject
+    assert f'requires-python = ">={minor}"' in repo
+
+
+def test_ci_matrix_matches_requires_python() -> None:
+    ci = (ROOT / "template" / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    pyproject = (ROOT / "template" / "pyproject.toml.jinja").read_text(encoding="utf-8")
+    requires_python = re.search(r'requires-python = ">=([0-9.]+)"', pyproject)
+    assert requires_python is not None
+    minor = requires_python.group(1)
+    matrix = re.search(r"python-version: \[(.*?)\]", ci)
+    assert matrix, "ci.yml must define a python-version matrix"
+    versions = [v.strip().strip('"') for v in matrix.group(1).split(",")]
+    assert versions[0] == minor, f"matrix starts at {versions[0]}, requires-python is >={minor}"
+
+
+def test_setup_uv_is_pinned_to_a_full_version() -> None:
+    # From v8 on, astral-sh/setup-uv only resolves full tags like @v10.3.3.
+    for workflow in (ROOT / "template" / ".github" / "workflows").glob("*.yml"):
+        text = workflow.read_text(encoding="utf-8")
+        for ref in re.findall(r"astral-sh/setup-uv@(\S+)", text):
+            assert re.fullmatch(r"v\d+\.\d+\.\d+", ref), (
+                f"{workflow.name}: @{ref} is not a full version"
+            )
+
+================================================================================
+FILE: updating.md
+================================================================================
+# Updating This Template
+
+This doc covers the full cycle for keeping the
+[python-template](https://github.com/MFDI-hub/python-template) template's dependencies
+and tools up to date, then verifying the changes end-to-end.
+
+There are two repos involved:
+
+- **Template repo** (`MFDI-hub/python-template`): The Copier template source. All version
+  changes start here. This repo does not have CI, so testing is done via a downstream
+  project.
+- **Downstream project(s)**: Projects created from the template (your libraries or apps on
+  GitHub under `MFDI-hub` or elsewhere). These pull updates via `copier update` and have CI
+  configured to run linting and tests across the Python version matrix.
+
+## Step 1: Check Latest Versions
+
+From the template repo, see what is current on PyPI:
+
+```shell
+uvx --from "pip>=24" pip index versions ruff ty pytest pre-commit codespell \
+  vulture commitizen mkdocs mkdocs-material funlog rich structlog tqdm
+```
+
+Also check for new major versions of the GitHub Actions used by the workflows:
+
+- `actions/checkout` — <https://github.com/actions/checkout/releases>
+- `astral-sh/setup-uv` — <https://github.com/astral-sh/setup-uv/releases>
+  (pin a **full** version: from v8 on, major tags such as `@v10` do not resolve)
+- `actions/setup-node`, `cycjimmy/semantic-release-action`
+- `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`
+
+And decide whether a new Python version should join the CI matrix — the matrix,
+the classifiers in `template/pyproject.toml.jinja`, `[tool.ruff] target-version`,
+`[tool.ty.environment] python-version`, and `requires-python` must all agree.
+
+## Step 2: Update the Template Files
+
+Edit these as needed:
+
+- **Dev dependency pins** in `template/pyproject.toml.jinja` (`[dependency-groups]`)
+- **uv version** in `template/.github/workflows/*.yml` (the `version:` input of
+  `astral-sh/setup-uv`) and the **Actions versions** in the same files
+- **Python version** in `requires-python`, classifiers, the CI matrix,
+  `.python-version`, `[tool.ruff] target-version` and `[tool.ty.environment]`
+- **Pre-commit hook `rev:` values** in `template/.pre-commit-config.yaml`
+
+## Step 2b: Verify the Template Renders and Passes Its Own Checks
+
+This repo ships Jinja, so nothing above is caught by ordinary lint. Run the gate,
+which renders the template twice, validates the generated files, and is the only
+thing that catches a broken `pyproject.toml.jinja` or a stray `${{ }}`:
+
+```shell
+git add -A                      # the gate renders the git index
+uv run --with copier python repo_check.py
+
+# Then lint/test the intended output as a real project:
+uv run --with copier python repo_check.py --keep /tmp/tmpl
+cd /tmp/tmpl/dash-name && uv sync --all-extras
+uv run python devtools/lint.py && uv run pytest -n auto --cov
+uv run mkdocs build --strict && uv build
+```
+
+Also lint this repo's own tooling: `uv run ruff check .` and `uv run pytest`.
+
+## Step 3: Commit, Tag, and Push the Template
+
+Copier requires a new Git tag to recognize an update. Increment the version from the
+last tag (check with `git tag -l | sort -V | tail -1`):
+
+```shell
+git add -A
+git commit -m "Update dependencies and tool versions."
+git tag v0.X.Y
+git push origin main --tags
+```
+
+## Step 4: Update a Downstream Project
+
+In a downstream project (e.g. `my-package`), pull the template update.
+The working tree must be clean before running `copier update`:
+
+```shell
+# Ensure a clean working tree:
+git stash --include-untracked  # if needed
+
+# Pull template changes:
+uvx copier update --defaults --vcs-ref HEAD
+# Drop --vcs-ref HEAD once you want to follow only released template tags.
+
+# Restore stash if needed:
+git stash pop
+```
+
+## Step 5: Verify Locally
+
+After the copier update, confirm everything works locally:
+
+```shell
+uv sync --upgrade
+uv run pre-commit install
+uv run python devtools/lint.py
+uv run pytest -n auto --cov --cov-report=term-missing
+uv run mkdocs build --strict
+uv build
+```
+
+## Step 6: Push Downstream and Confirm CI
+
+Commit and push the downstream project:
+
+```shell
+git add -A
+git commit -m "Update from MFDI-hub/python-template vX.Y.Z."
+git push origin main
+```
+
+Then check that **CI passes on GitHub** — this runs the full lint and test suite across
+all Python versions in the matrix (e.g. 3.11, 3.12, 3.13, 3.14) on the stub test file
+and template code. This is the real end-to-end validation that the template works.
+
+If CI fails, fix issues in the template repo and repeat from Step 2.
+
+## Step 7: Create a Release on the Template Repo
+
+Once CI passes downstream, create a GitHub release on the template repo. The template
+repo doesn't have its own CI, so the downstream CI run serves as the verification.
+
+```shell
+# From the template repo:
+gh release create v0.X.Y --title "v0.X.Y" --notes "$(cat <<'EOF'
+## What's Changed
+
+- **Updated dev dependencies**: ruff X.Y.Z, ty X.Y.Z, mkdocs X.Y.Z, etc.
+- **Updated uv** to X.Y.Z in CI workflows
+- Any other changes
+
+**Full Changelog**: https://github.com/MFDI-hub/python-template/compare/vPREVIOUS...v0.X.Y
+EOF
+)"
+```
+
+This makes the release visible to users and provides clear release notes on what was
+updated.
+

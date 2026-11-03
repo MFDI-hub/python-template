@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from scripts._lib.bootstrap import resolve_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 OUTPUTS_DIR = resolve_path("outputs")
 BUILDS_DIR = OUTPUTS_DIR / "builds"

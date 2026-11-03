@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from scripts._lib.bootstrap import REPO_ROOT, resolve_path
 from scripts._lib.outputs import write_output
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CODE_SKIP_DIRS = frozenset(
     {
@@ -210,7 +213,9 @@ def snapshot_paths(paths: list[Path]) -> dict[str, tuple[float, int]]:
     return state
 
 
-def snapshot_changed(previous: dict[str, tuple[float, int]], current: dict[str, tuple[float, int]]) -> bool:
+def snapshot_changed(
+    previous: dict[str, tuple[float, int]], current: dict[str, tuple[float, int]]
+) -> bool:
     if set(current) != set(previous):
         return True
     return any(current[key] != previous.get(key) for key in current)

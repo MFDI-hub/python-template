@@ -15,43 +15,54 @@ There are two repos involved:
 
 ## Step 1: Check Latest Versions
 
-From the template repo, check what's current on PyPI:
+From the template repo, see what is current on PyPI:
 
 ```shell
-# Check latest versions of each dev dependency:
-for pkg in ruff ty pytest pytest-sugar pytest-cov pytest-xdist codespell rich funlog \
-  mkdocs mkdocs-material pre-commit commitizen vulture structlog tqdm; do
-  echo "$pkg: $(curl -s https://pypi.org/pypi/$pkg/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])")"
-done
-
-# Check latest uv version:
-curl -s https://pypi.org/pypi/uv/json | python3 -c "import sys,json; print('uv:', json.load(sys.stdin)['info']['version'])"
+uvx --from "pip>=24" pip index versions ruff ty pytest pre-commit codespell \
+  vulture commitizen mkdocs mkdocs-material funlog rich structlog tqdm
 ```
 
-Also check for new major versions of GitHub Actions:
+Also check for new major versions of the GitHub Actions used by the workflows:
+
 - `actions/checkout` — <https://github.com/actions/checkout/releases>
 - `astral-sh/setup-uv` — <https://github.com/astral-sh/setup-uv/releases>
-- `actions/setup-node` — <https://github.com/actions/setup-node/releases>
-- `cycjimmy/semantic-release-action` — <https://github.com/cycjimmy/semantic-release-action/releases>
-- `aquasecurity/trivy-action` — <https://github.com/aquasecurity/trivy-action/releases>
+  (pin a **full** version: from v8 on, major tags such as `@v10` do not resolve)
+- `actions/setup-node`, `cycjimmy/semantic-release-action`
+- `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`
 
-And check if new Python versions should be added to the test matrix.
-
-Also bump pinned hook `rev:` values in `template/.pre-commit-config.yaml` when updating
-ruff/codespell.
+And decide whether a new Python version should join the CI matrix — the matrix,
+the classifiers in `template/pyproject.toml.jinja`, `[tool.ruff] target-version`,
+`[tool.ty.environment] python-version`, and `requires-python` must all agree.
 
 ## Step 2: Update the Template Files
 
-In the template repo, update these files as needed:
+Edit these as needed:
 
-- **Dev dependency version pins** in `template/pyproject.toml.jinja`
-- **uv version** in `template/.github/workflows/ci.yml` and `publish.yml`
-  (the `version:` field under `astral-sh/setup-uv`)
-- **GitHub Actions versions** (e.g. `actions/checkout@v7`) in the same workflow files.
-  Pin `astral-sh/setup-uv` to a full version (e.g. `v10.0.1`); from v8 onward,
-  major tags like `@v10` do not resolve.
-- **Python version matrix** in `template/.github/workflows/ci.yml` and the
-  corresponding classifiers in `template/pyproject.toml.jinja`
+- **Dev dependency pins** in `template/pyproject.toml.jinja` (`[dependency-groups]`)
+- **uv version** in `template/.github/workflows/*.yml` (the `version:` input of
+  `astral-sh/setup-uv`) and the **Actions versions** in the same files
+- **Python version** in `requires-python`, classifiers, the CI matrix,
+  `.python-version`, `[tool.ruff] target-version` and `[tool.ty.environment]`
+- **Pre-commit hook `rev:` values** in `template/.pre-commit-config.yaml`
+
+## Step 2b: Verify the Template Renders and Passes Its Own Checks
+
+This repo ships Jinja, so nothing above is caught by ordinary lint. Run the gate,
+which renders the template twice, validates the generated files, and is the only
+thing that catches a broken `pyproject.toml.jinja` or a stray `${{ }}`:
+
+```shell
+git add -A                      # the gate renders the git index
+uv run --with copier python repo_check.py
+
+# Then lint/test the intended output as a real project:
+uv run --with copier python repo_check.py --keep /tmp/tmpl
+cd /tmp/tmpl/dash-name && uv sync --all-extras
+uv run python devtools/lint.py && uv run pytest -n auto --cov
+uv run mkdocs build --strict && uv build
+```
+
+Also lint this repo's own tooling: `uv run ruff check .` and `uv run pytest`.
 
 ## Step 3: Commit, Tag, and Push the Template
 
@@ -71,13 +82,12 @@ In a downstream project (e.g. `my-package`), pull the template update.
 The working tree must be clean before running `copier update`:
 
 ```shell
-# Ensure clean working tree:
+# Ensure a clean working tree:
 git stash --include-untracked  # if needed
 
 # Pull template changes:
-copier update --defaults
-# Or, without globally installing Copier:
-uvx copier update --defaults
+uvx copier update --defaults --vcs-ref HEAD
+# Drop --vcs-ref HEAD once you want to follow only released template tags.
 
 # Restore stash if needed:
 git stash pop

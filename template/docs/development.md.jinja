@@ -29,6 +29,8 @@ make build
 
 # Linting (codespell, ruff, ty, vulture):
 make lint
+# or, without make:
+uv run python devtools/lint.py
 
 # Run tests (parallel + coverage):
 make test
@@ -76,6 +78,29 @@ source .venv/bin/activate
 ```
 
 See [uv docs](https://docs.astral.sh/uv/) for details.
+
+### Running individual tools
+
+All tool configuration lives in `pyproject.toml`, so each tool can also be driven
+directly (this is what editors and CI do):
+
+```shell
+uv run ruff check .            # lint
+uv run ruff check --fix .      # lint + autofix
+uv run ruff format .           # format (or --check to verify only)
+uv run ty check                # type check (paths come from [tool.ty.src])
+uv run codespell               # spelling
+uv run vulture                 # dead code
+uv run pytest                  # tests
+uv run pytest -n auto -k name  # parallel, filtered
+```
+
+The `Makefile` wraps the common combinations (`make install`, `make lint`, `make test`,
+`make docs-build`), and `devtools/lint.py` runs the whole lint chain in one go.
+
+`ty` is pre-1.0. If a third-party package ships no type information, prefer
+`[tool.ty.analysis] allowed-unresolved-imports` over sprinkling `# type: ignore`.
+Run `uv run ty check --output-format concise` to see rule names for `[tool.ty.rules]`.
 
 ## Sync chosen files
 

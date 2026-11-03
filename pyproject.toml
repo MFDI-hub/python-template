@@ -1,18 +1,96 @@
+# Repo config for the Copier template itself (NOT rendered into generated projects).
+# The project pyproject that users get lives in template/pyproject.toml.jinja.
+#
+# Everything in [dependency-groups].dev is needed to develop, lint, test, and
+# release this template. Generated projects get their own (larger) dev group.
+
 [project]
 name = "python-template"
 version = "0.1.0"
 description = "A Copier template for Python libraries/projects."
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/MFDI-hub/python-template"
 
 [dependency-groups]
 dev = [
-    "copier>=9.4.0",
-    "ruff>=0.15.1",
-    "funlog>=0.2.1",
-    "rich>=14.3.2"
+    # Template engine + rendering.
+    "copier>=9.19.1",
+    # Lint/format/type-check this repo's own tooling and tests. The template
+    # itself is checked after rendering, by the generated project's config.
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    # Tests for the repo tooling and the template's cross-file contracts.
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    # Dead-code check over the repo tooling ([tool.vulture] below).
+    "vulture>=2.16",
 ]
 
-
-
 [tool.ruff]
+# Keep in sync with template/pyproject.toml.jinja.
 line-length = 100
+target-version = "py311"
+# template/ holds Jinja files, so it is checked where it actually counts: the
+# rendered project is linted in CI (see repo_check.py), not the raw templates.
+extend-exclude = [
+    ".template-check",
+    "outputs",
+    "site",
+    "template",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", # pycodestyle
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+    "PGH",    # pygrep-hooks (blanket noqa / blanket type: ignore)
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line length is handled by the formatter
+    "B008",   # function calls in argument defaults (e.g. typer.Option())
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts", "devtools"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally have unused arguments (fixtures) and assert outside pytest.raises.
+"test*.py" = ["ARG001", "ARG002", "S101"]
+"conftest.py" = ["ARG001"]
+
+[tool.ty.environment]
+# Keep in sync with template/pyproject.toml.jinja.
+python-version = "3.11"
+
+[tool.ty.rules]
+unused-ignore-comment = "warn"
+
+[tool.pytest.ini_options]
+testpaths = ["template_tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+
+[tool.coverage.run]
+branch = true
+source = ["template_tests"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.vulture]
+min_confidence = 80
+paths = ["template_tests"]

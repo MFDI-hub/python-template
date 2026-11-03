@@ -30,9 +30,7 @@ DEFAULT_CODE_OUT = "outputs/builds/source_dump.txt"
 def main() -> int:
     load_env()
 
-    ap = argparse.ArgumentParser(
-        description="Sync chosen source files into one text dump."
-    )
+    ap = argparse.ArgumentParser(description="Sync chosen source files into one text dump.")
     ap.add_argument(
         "paths",
         nargs="*",

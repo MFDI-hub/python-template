@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Scratch output from repo_check.py and local tool runs
+.template-check/
+pytest-cache-files-*/

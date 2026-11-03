@@ -1,25 +1,33 @@
 import subprocess
 
 from funlog import log_calls
-from rich import get_console, reconfigure
-from rich import print as rprint
+from rich import get_console, print as rprint, reconfigure
 
-# Update as needed.
+# Update as needed. These paths must match the tool configs in pyproject.toml
+# ([tool.ruff.lint.isort] known-first-party, [tool.ty.src] include, ...).
 SRC_PATHS = ["src", "tests", "devtools", "scripts"]
-DOC_PATHS = ["README.md", "docs"]
+DOC_PATHS = ["README.md", "docs", "CONTRIBUTING.md"]
+
+# Files worth spell-checking that are neither source nor docs.
+OTHER_SPELL_PATHS = ["pyproject.toml", "Makefile", "mkdocs.yml"]
 
 
 reconfigure(emoji=not get_console().options.legacy_windows)  # No emojis on legacy windows.
 
 
-def main():
+def main() -> int:
     rprint()
 
     errcount = 0
-    errcount += run(["codespell", "--write-changes", *SRC_PATHS, *DOC_PATHS])
+    errcount += run(["codespell", "--write-changes", *SRC_PATHS, *DOC_PATHS, *OTHER_SPELL_PATHS])
+    # Fix what can be fixed, then let the formatter and type checker work on
+    # the result; the last ruff pass reports anything left over.
     errcount += run(["ruff", "check", "--fix", *SRC_PATHS])
     errcount += run(["ruff", "format", *SRC_PATHS])
-    errcount += run(["ty", "check", *SRC_PATHS])
+    errcount += run(["ruff", "check", *SRC_PATHS])
+    # ty reads [tool.ty] in pyproject.toml, so it needs no paths to stay in sync
+    # with the config (passing paths would silently include/exclude files).
+    errcount += run(["ty", "check"])
     errcount += run(["vulture", *SRC_PATHS])
 
     rprint()
@@ -51,4 +59,4 @@ def run(cmd: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    exit(main())
+    raise SystemExit(main())

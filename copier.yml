@@ -1,42 +1,53 @@
-# Copier configuration.
+# Copier configuration for https://github.com/MFDI-hub/python-template
+# Docs: https://copier.readthedocs.io/
 
 _min_copier_version: "9.4.0"
 _subdirectory: template
-_message_after_copy: | 
-    Your package template has been copied!
+# Generated projects start as a git repo with one "Initial template commit".
+_tasks:
+  - "git init --quiet"
+  - "git add -A"
+  - 'git commit --quiet -m "chore: initial commit from MFDI-hub/python-template" --no-verify'
 
-    Remember to look for any unfilled `changeme` strings and confirm the license!
-    By default this template uses MIT license.
-    See `license` in pyproject.toml and update the LICENSE file. 
+_message_after_copy: |
+  Copied successfully! Next steps:
 
-    Next steps:
-    
     cd PROJECT  # skip if you copied into `.`
-    make install
-    git init
-    # Make license or other initial adjustments if needed.
-    git add .
-    uv run cz commit
-    # Or: git commit -m "chore: initial commit from MFDI-hub/python-template."
-    # Create repo on GitHub.
-    git remote add origin git@github.com:OWNER/PROJECT.git  # or https://...
+    uv sync --all-extras          # creates .venv and uv.lock
+    uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
+    uv run pytest -n auto --cov   # or: make install && make
+
+  Before publishing, search for unfilled `changeme` strings and confirm the
+  metadata in pyproject.toml (name, description, author, URLs, license).
+  This template ships the MIT license; see the `license` field and LICENSE.
+
+  Then create the GitHub repo and push:
+
+    git remote add origin git@github.com:OWNER/PROJECT.git
     git branch -M main
     git push -u origin main
 
+  Releases: commit with Conventional Commits (`uv run cz commit`) and
+  semantic-release tags + publishes for you. See docs/publishing.md.
+
+# ---- Questions ----
+
 package_name:
     type: str
-    help: What is the package name? (This will be the GitHub repo and PyPI package name, so use CamelCase, dash-case, or snake_case. This is the only required field.)
+    help: Package name? (GitHub repo + PyPI name, e.g. CamelCase, dash-case or snake_case. Only required field.)
     default: changeme
 
 package_module:
     type: str
-    help: Package module name? (This is the Python module, so use snake_case. Or press enter to fill in later.)
-    default: "{{ package_name.replace('-', '_').replace('.', '_') }}"
-    validator: "{% if not package_module.isidentifier() %}Must be a valid Python identifier (snake_case, no hyphens).{% endif %}"
+    help: Python module name? (snake_case; imported as `import <package_module>`. Press enter to derive it from the package name.)
+    default: "{{ package_name | lower | replace('-', '_') | replace('.', '_') }}"
+    validator: >-
+        {% if not package_module.isidentifier() %}Must be a valid Python identifier: snake_case, no hyphens or spaces.{% endif %}
+        {% if package_module != package_module | lower %}Must be lowercase; PyPI project names are case-insensitive, module names are not.{% endif %}
 
 package_description:
     type: str
-    help: Package description? (Press enter to fill in later.)
+    help: One-line package description? (Shown on PyPI and in docs. Press enter to fill in later.)
     default: changeme
 
 package_author_name:
@@ -51,10 +62,10 @@ package_author_email:
 
 package_github_org:
     type: str
-    help: Package GitHub org or username? (Press enter to fill in later.)
+    help: GitHub org or username that will host the repo? (Press enter to fill in later.)
     default: changeme
 
 copyright_year:
     type: str
-    help: Copyright year for LICENSE?
+    help: Copyright year for the LICENSE?
     default: "2026"

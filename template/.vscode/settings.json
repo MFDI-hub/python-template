@@ -14,5 +14,8 @@
       "source.fixAll.ruff": "always",
       "source.organizeImports.ruff": "always"
     }
-  }
+  },
+  // Type checking is done by ty (astral-sh.ty extension), which reads [tool.ty]
+  // from pyproject.toml. Pylance/Pyright is not used by this project.
+  "python.languageServer": "None"
 }

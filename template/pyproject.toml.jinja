@@ -1,185 +1,262 @@
-# ---- Project Info and Dependencies ----
+# ---- Project info ----
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/
 
-[project.urls]
-Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
-# Homepage = "https://..."
-# Documentation = "https://..."
-
+# Standard project metadata. [project] must come first: TOML tables cannot be
+# reopened later in the file.
 [project]
 name = "{{ package_name }}"
 description = "{{ package_description }}"
 authors = [
-    { name="{{ package_author_name }}", email="{{ package_author_email }}" },
+    { name = "{{ package_author_name }}", email = "{{ package_author_email }}" },
 ]
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11"
+# Version comes from git tags at build time (see [tool.uv-dynamic-versioning]).
 dynamic = ["version"]
 
-# https://pypi.org/classifiers/
-# Adjust as needed:
+# https://pypi.org/classifiers/ — adjust as needed:
 classifiers = [
-    # Adjust as needed:
     "Development Status :: 4 - Beta",
     # "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
-    # Include this to avoid accidentally publishing to PyPI:
+    # Uncomment to make PyPI refuse a publish by accident:
     # "Private :: Do Not Upload",
 ]
 
-
-# ---- Main dependencies ----
-
-dependencies = [
-]
-
-
-# ---- Optional runtime extras ----
+dependencies = []
 
 [project.optional-dependencies]
 observability = [
-    "structlog>=25.1.0",
-    "tqdm>=4.67.1",
+    "structlog>=26.1.0",
+    "tqdm>=4.70.1",
 ]
 
+[project.urls]
+Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
+# Homepage = "https://..."
+# Documentation = "https://..."
 
-# ---- Dev dependencies ----
+[project.scripts]
+# Prefer the module name (snake_case); hyphens in a console script name can
+# break the generated .exe shim on Windows.
+{{ package_module }} = "{{ package_module }}:main"
+
+
+# ---- Dependency groups (PEP 735) ----
+# Installed by "uv sync" (dev is the default group) and by
+# "uv run <tool>" when the tool is missing. Extras are installed with
+# "uv sync --all-extras".
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "pytest-sugar>=1.1.1",
-    "pytest-cov>=6.1.1",
-    "pytest-xdist>=3.6.1",
-    "ruff>=0.15.1",
-    "codespell>=2.4.1",
-    "rich>=14.3.2",
-    "ty",
+    "ruff>=0.17.3",
+    "ty>=0.0.96",
+    "codespell>=2.4.3",
+    "pre-commit>=4.7.0",
+    "commitizen>=4.19.3",
+    "vulture>=2.16",
+    "rich>=15.0.0",
     "funlog>=0.2.1",
-    "mkdocs",
-    "mkdocs-material",
-    "mkdocs-git-revision-date-localized-plugin",
-    "pre-commit>=4.2.0",
-    "commitizen>=4.8.3",
-    "vulture>=2.14",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.8.0",
+    "mkdocs-git-revision-date-localized-plugin>=1.6.3",
 ]
 
-[project.scripts]
-# Use the module name (snake_case). Hyphens in package_name can break the
-# console script on Windows.
-{{ package_module }} = "{{ package_module }}:main"
 
-[tool.uv.scripts]
-sync-chosen-files = "python scripts/sync_chosen_files.py"
-
+# ---- uv ----
+# uv needs no table of its own to work: `uv run <cmd>` uses the dev group, and
+# `uv sync --all-extras` adds the optional extras. Day-to-day shortcuts live in
+# the Makefile and in devtools/lint.py. If you want more, add them there.
 
 # ---- Build system ----
-
-# Dynamic versioning from:
-# https://github.com/ninoseki/uv-dynamic-versioning/
+# Version comes from git tags: https://github.com/ninoseki/uv-dynamic-versioning/ 
+# Keep both requirements pinned to the same version.
 
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
+requires = ["hatchling>=1.33.0", "uv-dynamic-versioning[hatch]>=0.14.1"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
-# Note JSON schemas don't seem to be right for tool.hatch.version.source so
-# this may cause false warnings in IDEs.
+# JSON schemas for tool.hatch.version.source are incomplete, so IDEs may warn:
 # https://github.com/ninoseki/uv-dynamic-versioning/issues/21
 
 [tool.uv-dynamic-versioning]
 vcs = "git"
 style = "pep440"
-bump = true
+# Release commits/tags are created by semantic-release (.releaserc.yml).
+bump = false
 
 [tool.hatch.build.targets.wheel]
-# The source location for the package.
 packages = ["src/{{ package_module }}"]
 
 
-# ---- Settings ----
+# ---- Ruff (lint + format) ----
+# https://docs.astral.sh/ruff/configuration/
 
 [tool.ruff]
-# Set as desired, typically 88 (black standard) or 100 (wide).
+# Typically 88 (black standard) or 100 (wide).
 line-length = 100
+# Oldest Python in requires-python: lets ruff modernise code for it (UP rules).
+target-version = "py311"
+# Also lint docstring code blocks and notebooks once you have them:
+# extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
+# Curated rule set from the Ruff docs, plus a few high-value families.
+# Full catalogue: https://docs.astral.sh/ruff/rules/
 select = [
-    # See: https://docs.astral.sh/ruff/rules/
-    # Basic list from: https://docs.astral.sh/ruff/linter/#rule-selection
-    "E", # https://docs.astral.sh/ruff/rules/#error-e
-    "F", # https://docs.astral.sh/ruff/rules/#pyflakes-f
-    "UP", # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-    "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
-    "I", # https://docs.astral.sh/ruff/rules/#isort-i
-    # Other possibilities:
-    # "D", # https://docs.astral.sh/ruff/rules/#pydocstyle-d
-    # "Q", # https://docs.astral.sh/ruff/rules/#flake8-quotes-q
-    # "COM", # https://docs.astral.sh/ruff/rules/#flake8-commas-com
-    # "SIM", # https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
-
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort (import sorting)
+    "UP",      # pyupgrade
+    "B",       # flake8-bugbear
+    "C4",      # flake8-comprehensions
+    "SIM",     # flake8-simplify
+    "ARG",     # flake8-unused-arguments
+    "TCH",     # flake8-type-checking (move type-only imports behind TYPE_CHECKING)
+    "PTH",     # flake8-use-pathlib
+    "ERA",     # eradicate (commented-out code)
+    "PGH",     # pygrep-hooks (no blanket "# type: ignore" / "# noqa")
+    "RUF",     # ruff-specific
+    # "S",     # flake8-bandit (security) — noisy for libraries, see [tool.ruff.lint.flake8-bandit]
+    # "D",     # pydocstyle (docstrings) — enable once you write docstrings
+    # "N",     # pep8-naming
+    # "ANN",   # flake8-annotations (needs ty's ruff-era typing discipline)
+    # "PT",    # flake8-pytest-style
+    # "TRY",   # tryceratops
 ]
 ignore = [
-    # Disable some rules that are overly pedantic. Add/remove as desired:
-    "E501", # https://docs.astral.sh/ruff/rules/line-too-long/
-    "E402", # https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file/
-    "E731", # https://docs.astral.sh/ruff/rules/lambda-assignment/
-    # We use both ruff formatter and linter so some rules should always be disabled.
-    # See: https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-    "W191", # https://docs.astral.sh/ruff/rules/tab-indentation/
-    "E111", # https://docs.astral.sh/ruff/rules/indentation-with-invalid-multiple/
-    "E114", # https://docs.astral.sh/ruff/rules/indentation-with-invalid-multiple-comment/
-    "E117", # https://docs.astral.sh/ruff/rules/over-indented/
-    "D206", # https://docs.astral.sh/ruff/rules/docstring-tab-indentation/
-    "D300", # https://docs.astral.sh/ruff/rules/triple-single-quotes/
-    "Q000", # https://docs.astral.sh/ruff/rules/bad-quotes-inline-string/
-    "Q001", # https://docs.astral.sh/ruff/rules/bad-quotes-multiline-string/
-    "Q002", # https://docs.astral.sh/ruff/rules/bad-quotes-docstring/
-    "Q003", # https://docs.astral.sh/ruff/rules/avoidable-escaped-quote/
-    "COM812", # https://docs.astral.sh/ruff/rules/missing-trailing-comma/
-    "COM819", # https://docs.astral.sh/ruff/rules/prohibited-trailing-comma/
-    "ISC002", # https://docs.astral.sh/ruff/rules/multi-line-implicit-string-concatenation/
+    # Disabled on purpose (add/remove as desired):
+    "E501",    # https://docs.astral.sh/ruff/rules/line-too-long/ — the formatter owns line length
+    "E402",    # module-import-not-at-top-of-file — needed for sys.path/uv scripts
+    "E731",    # lambda-assignment — handy for short callbacks
+    # Always disable these when using ruff format + ruff check together:
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "W191", "E111", "E114", "E117",
+    "D206", "D300",
+    "Q000", "Q001", "Q002", "Q003",
+    "COM812", "COM819",
+    "ISC001", "ISC002",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests often need "unused" fixture arguments and assert inside helpers.
+"tests/**" = ["ARG001", "ARG002", "S101", "B018"]
+# An __init__.py re-exporting a public API looks like unused imports.
+"src/**/__init__.py" = ["F401"]
+# Scripts are thin wrappers around argparse.
+"scripts/**" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["{{ package_module }}"]
+combine-as-imports = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+
+# ---- ty (type checking) ----
+# https://docs.astral.sh/ty/configuration/
+
+[tool.ty.environment]
+# Keep in sync with requires-python above; ty would otherwise infer it, but
+# being explicit keeps editors and CI on the same target.
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["src", "tests", "devtools", "scripts"]
+
+[tool.ty.rules]
+# ty is pre-1.0 and some rules are noisy; demote here instead of ignoring whole
+# files. `uv run ty check --output-format concise` lists every diagnostic code.
+unused-ignore-comment = "warn"
+
+# Unresolved third-party imports are an environment problem, not a code problem.
+# If a dependency ships no stubs or py.typed marker, allow it explicitly:
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["untyped_package.**"]
+
+# ---- codespell ----
+# https://github.com/codespell-project/codespell
+
 [tool.codespell]
-# Add here as needed:
+skip = "*.lock,uv.lock,.git,dist,site,htmlcov,outputs"
 # ignore-words-list = "foo,bar"
-# skip = "foo.py,bar.py"
+
+
+# ---- pytest ----
+# https://docs.pytest.org/en/stable/reference/reference.html#configuration-options
 
 [tool.pytest.ini_options]
 python_files = ["*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-testpaths = [
-    "src",
-    "tests",
-]
-norecursedirs = []
-filterwarnings = []
+testpaths = ["tests"]
+# src/ layout: make the package importable without installing it first.
+pythonpath = ["src"]
 addopts = [
     "-ra",
     "--strict-markers",
+    "--strict-config",
 ]
+# Treat warnings from your own code as errors; third-party noise stays a warning.
+filterwarnings = [
+    "default",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: touches the network, disk, or another process",
+]
+
+
+# ---- coverage ----
+# https://coverage.readthedocs.io/en/stable/config.html
 
 [tool.coverage.run]
 branch = true
 source = ["src"]
+relative_files = true
+
+[tool.coverage.paths]
+# Merge coverage produced in different places (local, CI, containers).
+source = [
+    "src/",
+    "*/site-packages/",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-# Raise this as the project grows (placeholder tests start near 0%):
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "def __repr__",
+    "@(typing\\.)?overload",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.",
+]
+# Raise this as the project matures (placeholder tests start near 0%):
 # fail_under = 80
+
+
+# ---- Commitizen (Conventional Commits helper) ----
+# https://commitizen-tools.github.io/commitizen/config/
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -187,6 +264,9 @@ tag_format = "v$version"
 version_provider = "scm"
 update_changelog_on_bump = true
 changelog_file = "CHANGELOG.md"
+
+
+# ---- vulture (dead code) ----
 
 [tool.vulture]
 min_confidence = 80
