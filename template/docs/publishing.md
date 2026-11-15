@@ -17,6 +17,10 @@ You can release in either way:
    a bump. That release triggers `publish.yml`.
 2. **Manual:** create a tagged release yourself in the GitHub UI or with `gh` (below).
 
+`publish.yml` can also be started with **Run workflow**. Start it from the release
+tag. A dispatch from a branch has no `vX.Y.Z` tag, so uv-dynamic-versioning produces
+a local version that PyPI rejects.
+
 ### First-Time Setup
 
 This part is a little confusing the first time.

@@ -72,6 +72,7 @@ REQUIRED_FILES = (
     ".gitignore",
     ".copier-answers.yml",
     "src/{m}/__init__.py",
+    "src/{m}/__main__.py",
     "src/{m}/py.typed",
     "tests/test_placeholder.py",
     "devtools/lint.py",
@@ -228,7 +229,7 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         raise CheckFailed(f"unexpected requires-python: {project['requires-python']}")
     if project.get("dynamic") != ["version"]:
         raise CheckFailed("project.dynamic must be ['version']")
-    if project["scripts"].get(module) != f"{module}:main":
+    if project["scripts"].get(module) != f"{module}.{module}:main":
         raise CheckFailed(f"console script for {module} is wrong: {project['scripts']}")
 
     groups = data["dependency-groups"]
@@ -243,6 +244,7 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         "deptry",
         "pytest-asyncio",
         "pytest-timeout",
+        "pytest-randomly",
     ):
         if not any(d.startswith(tool) for d in dev):
             raise CheckFailed(f"dev dependency group is missing {tool}")
@@ -272,11 +274,17 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         # Without this, splitting docs out of dev silently stops `uv sync`
         # installing MkDocs, and every `uv run mkdocs ...` fails.
         raise CheckFailed(f"[tool.uv] default-groups should be ['dev', 'docs'], got {defaults!r}")
+    if "scripts" in data["tool"]["uv"]:
+        raise CheckFailed("[tool.uv.scripts] is not a uv feature; invoke scripts directly")
 
     if "deptry" not in data["tool"]:
         raise CheckFailed("missing [tool.deptry] configuration")
     if "S" not in ruff["lint"]["select"]:
         raise CheckFailed("ruff should select the S (bandit) security rules")
+    if "TC" not in ruff["lint"]["select"]:
+        raise CheckFailed("ruff select must include TC")
+    if "TCH" in ruff["lint"]["select"]:
+        raise CheckFailed("ruff select still uses the retired TCH code")
     if data["tool"]["coverage"]["report"].get("fail_under") != 80:
         raise CheckFailed("[tool.coverage.report] fail_under should be 80")
 
@@ -314,6 +322,24 @@ def check_workflows(dest: Path, _answers: Answers) -> None:
             raise CheckFailed(f"ci.yml lost the GitHub Actions expression {expr}")
     if 'python-version: ["3.10"' in ci:
         raise CheckFailed("ci.yml still tests 3.10 while requires-python is >=3.11")
+    if "devtools/lint.py --check" not in ci:
+        raise CheckFailed("ci.yml must lint with --check so rewrites cannot hide failures")
+    if "uv audit --locked" not in ci:
+        raise CheckFailed("ci.yml must audit uv.lock with uv audit --locked")
+    if "pip-audit" in ci:
+        raise CheckFailed("ci.yml must audit with uv audit")
+    if '"3.15"' not in ci:
+        raise CheckFailed("ci.yml matrix must include Python 3.15")
+
+    publish = (dest / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+    if "enable-cache: false" not in publish:
+        raise CheckFailed("publish.yml must leave the uv cache disabled")
+
+    makefile = (dest / "Makefile").read_text(encoding="utf-8")
+    if "uv run sync-chosen-files" in makefile:
+        raise CheckFailed("Makefile calls uv run sync-chosen-files; uv has no script table")
+    if "python scripts/sync_chosen_files.py" not in makefile:
+        raise CheckFailed("Makefile must invoke scripts/sync_chosen_files.py")
 
 
 def strip_jsonc(text: str) -> str:
@@ -348,7 +374,7 @@ def strip_jsonc(text: str) -> str:
     return "".join(out)
 
 
-def check_json_files(dest: Path, _answers: Answers) -> None:
+def check_json_files(dest: Path, answers: Answers) -> None:
     """Editor and devcontainer JSON must parse comments stripped."""
     for rel in (".vscode/settings.json", ".vscode/tasks.json", ".devcontainer/devcontainer.json"):
         text = (dest / rel).read_text(encoding="utf-8")
@@ -356,6 +382,28 @@ def check_json_files(dest: Path, _answers: Answers) -> None:
             json.loads(strip_jsonc(text))
         except json.JSONDecodeError as exc:
             raise CheckFailed(f"{rel} is not valid JSON: {exc}") from exc
+
+    devcontainer = (dest / ".devcontainer/devcontainer.json").read_text(encoding="utf-8")
+    if "astral-sh/uv-feature" in devcontainer:
+        raise CheckFailed("devcontainer references a uv feature Astral does not publish")
+    if "ghcr.io/va-h/devcontainers-features/uv:1" not in devcontainer:
+        raise CheckFailed("devcontainer must install uv from a published feature")
+
+    module = module_of(dest)
+    init_py = (dest / "src" / module / "__init__.py").read_text(encoding="utf-8")
+    if f'version("{answers.package_name}")' not in init_py:
+        raise CheckFailed("__version__ must come from importlib.metadata.version(package name)")
+    if "PackageNotFoundError" not in init_py:
+        raise CheckFailed("__version__ needs a PackageNotFoundError fallback")
+    main_py = (dest / "src" / module / "__main__.py").read_text(encoding="utf-8")
+    if "main()" not in main_py:
+        raise CheckFailed("__main__.py must call main()")
+    rtd = (dest / "docs" / "requirements-rtd.txt").read_text(encoding="utf-8")
+    if "mkdocstrings" not in rtd:
+        raise CheckFailed("docs/requirements-rtd.txt must install mkdocstrings")
+    mkdocs = (dest / "mkdocs.yml").read_text(encoding="utf-8")
+    if "paths: [src]" not in mkdocs:
+        raise CheckFailed("mkdocs python handler needs paths: [src]")
 
 
 CHECKS: tuple[Callable[[Path, Answers], None], ...] = (

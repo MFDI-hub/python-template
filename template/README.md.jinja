@@ -21,7 +21,7 @@ For instructions on publishing to PyPI, see [publishing.md](docs/publishing.md).
 ```shell
 # Install project dependencies + git hooks:
 make install
-# or: uv sync --all-extras && uv run pre-commit install
+# or: uv sync && uv run pre-commit install
 
 # Run quality checks:
 uv run python devtools/lint.py
@@ -33,10 +33,9 @@ uv build
 
 ## Lockfile (`uv.lock`)
 
-`make install` / `uv sync` creates a `uv.lock` for reproducible development
-environments. For **libraries**, you may choose not to commit `uv.lock` so consumers
-are not pinned to your exact dependency tree. For **applications**, commit `uv.lock`
-so deployments are reproducible.
+Commit `uv.lock`. CI runs `uv sync --locked` and fails when the lockfile is missing
+or stale. The lockfile pins this repository's development environment. Published
+installs resolve from the version ranges in `pyproject.toml`.
 
 * * *
 

@@ -4,7 +4,7 @@
     {
       "label": "install",
       "type": "shell",
-      "command": "uv sync --all-extras",
+      "command": "uv sync",
       "group": "build",
       "problemMatcher": []
     },
@@ -63,14 +63,14 @@
     {
       "label": "upgrade",
       "type": "shell",
-      "command": "uv sync --upgrade --all-extras --dev",
+      "command": "uv sync --upgrade",
       "group": "build",
       "problemMatcher": []
     },
     {
       "label": "sync-chosen-files",
       "type": "shell",
-      "command": "uv run sync-chosen-files --once",
+      "command": "uv run python scripts/sync_chosen_files.py --once",
       "group": "build",
       "problemMatcher": []
     }

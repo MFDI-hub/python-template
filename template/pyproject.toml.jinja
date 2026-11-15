@@ -27,6 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Typing :: Typed",
     # Uncomment to make PyPI refuse a publish by accident:
     # "Private :: Do Not Upload",
@@ -49,7 +50,7 @@ Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
 [project.scripts]
 # Prefer the module name (snake_case); hyphens in a console script name can
 # break the generated .exe shim on Windows.
-{{ package_module }} = "{{ package_module }}:main"
+{{ package_module }} = "{{ package_module }}.{{ package_module }}:main"
 
 
 # ---- Dependency groups (PEP 735) ----
@@ -74,6 +75,8 @@ dev = [
     "pytest-timeout>=2.4.0",
     "pytest-asyncio>=1.4.1",
     "pytest-mock>=3.17.0",
+    # Shuffles test order. `make test-random` runs once with it and once without.
+    "pytest-randomly>=5.1.0",
     # Git hooks, commits, releases.
     "pre-commit>=4.7.0",
     "commitizen>=4.19.3",
@@ -108,8 +111,9 @@ profiling = [
 default-groups = ["dev", "docs"]
 
 # ---- Build system ----
-# Version comes from git tags: https://github.com/ninoseki/uv-dynamic-versioning/ 
-# Keep both requirements pinned to the same version.
+# hatchling builds the sdist and wheel. uv-dynamic-versioning reads the version
+# from git tags at build time. Pin each requirement on its own.
+# https://github.com/ninoseki/uv-dynamic-versioning/
 
 [build-system]
 requires = ["hatchling>=1.33.0", "uv-dynamic-versioning[hatch]>=0.14.1"]
@@ -153,7 +157,7 @@ select = [
     "C4",      # flake8-comprehensions
     "SIM",     # flake8-simplify
     "ARG",     # flake8-unused-arguments
-    "TCH",     # flake8-type-checking (move type-only imports behind TYPE_CHECKING)
+    "TC",      # flake8-type-checking (move type-only imports behind TYPE_CHECKING)
     "PTH",     # flake8-use-pathlib
     "ERA",     # eradicate (commented-out code)
     "PGH",     # pygrep-hooks (no blanket "# type: ignore" / "# noqa")

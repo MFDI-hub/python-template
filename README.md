@@ -17,20 +17,23 @@ Then run Copier through `uvx` (no global install required). Nothing else is need
 Into a new folder:
 
 ```shell
-uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template my-package
+uvx --with jinja2-time copier copy --trust --vcs-ref HEAD https://github.com/MFDI-hub/python-template my-package
 cd my-package
 ```
 
 Into the current folder (for example an empty git repo you already created on GitHub):
 
 ```shell
-uvx copier copy --vcs-ref HEAD https://github.com/MFDI-hub/python-template .
+uvx --with jinja2-time copier copy --trust --vcs-ref HEAD https://github.com/MFDI-hub/python-template .
 ```
+
+`jinja2-time` supplies the copyright-year default. `--trust` allows the template's
+git-init task and that Jinja extension.
 
 ### 3) Start developing
 
 ```shell
-uv sync --all-extras
+uv sync
 uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
 uv run pytest -n auto --cov   # or: make install && make
 ```
@@ -48,7 +51,7 @@ Copier prompts if a file already exists (`.gitignore` is a common conflict). Ans
 ## Updating an existing project from the template
 
 ```shell
-uvx copier update --vcs-ref HEAD
+uvx --with jinja2-time copier update --trust --vcs-ref HEAD
 ```
 
 The working tree must be clean first. Your answers are re-used; conflicts are written
@@ -77,7 +80,7 @@ python repo_check.py         # render the template + verify every generated file
 - **pytest** + **pytest-cov** + **pytest-xdist** — tests, coverage, parallelism
 - **MkDocs** + **Material for MkDocs** — docs
 - **Makefile** — `install`, `lint`, `test`, `docs`, `build`, `clean`, `upgrade`
-- **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, pip-audit) and PyPI publish (OIDC)
+- **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, uv audit) and PyPI publish (OIDC)
 
 
 
@@ -98,7 +101,7 @@ python repo_check.py         # render the template + verify every generated file
 
 - **Dependabot** — weekly updates for Actions and Python dependencies
 - **Trivy** — filesystem scan in CI
-- **pip-audit** — vulnerability audit of locked runtime dependencies (`make security`)
+- **uv audit** — vulnerability audit of `uv.lock` (`make security` and CI)
 - **deptry** — dependency hygiene on every lint run
 - **ruff `S` rules** — bandit-equivalent security checks inline in the linter
 
@@ -118,7 +121,6 @@ python repo_check.py         # render the template + verify every generated file
 - **.python-version** — pins the default interpreter for `uv`
 - **devcontainer.json** — Codespaces / VS Code Dev Containers
 - **VS Code tasks + settings** — ruff format on save, ty, `install`/`lint`/`test` tasks
-- **Optional extras** — `structlog` + `tqdm` via `uv sync --extra observability`
 
 ## License
 

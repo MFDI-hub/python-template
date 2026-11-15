@@ -16,3 +16,10 @@ def test_version_is_a_string() -> None:
 
 def test_main_runs() -> None:
     assert cli.main() is None
+
+
+def test_python_m_entrypoint() -> None:
+    import importlib
+
+    entry = importlib.import_module("{{ package_module }}.__main__")
+    assert entry.main is cli.main

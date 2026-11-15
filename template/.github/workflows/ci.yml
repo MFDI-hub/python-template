@@ -21,8 +21,8 @@ jobs:
         # Update this as needed:
         # Common platforms: ["ubuntu-latest", "macos-latest", "windows-latest"]
         os: ["ubuntu-latest"]
-        # Matches requires-python in pyproject.toml (>=3.11).
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        # Floor matches requires-python in pyproject.toml (>=3.11).
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     # Linux only by default. Use ${{ matrix.os }} for other OSes.
     runs-on: ${{ matrix.os }}
@@ -42,7 +42,7 @@ jobs:
         with:
           # Pin a full version: from v8 on, major tags like "@v10" do not resolve.
           # Update this as needed.
-          version: "0.13.7"
+          version: "0.13.8"
           enable-cache: true
           # Creates the matrix interpreter if it is missing.
           python-version: ${{ matrix.python-version }}
@@ -58,9 +58,9 @@ jobs:
         # Default groups (dev + docs) come from [tool.uv] default-groups.
         run: uv sync --locked
 
-      # Runs codespell, ruff (check + format), ty, vulture and deptry.
+      # --check reports only. Local `make lint` may still rewrite files.
       - name: Run linting
-        run: uv run python devtools/lint.py
+        run: uv run python devtools/lint.py --check
 
       - name: Run tests with coverage
         run: >
@@ -68,6 +68,13 @@ jobs:
           --cov
           --cov-report=term-missing
           --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: error
 
       - name: Verify Docs Build
         run: uv run mkdocs build --strict
@@ -97,13 +104,12 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.3
         with:
-          version: "0.13.7"
+          version: "0.13.8"
           enable-cache: true
           python-version: "3.13"
 
-      - name: Export dependencies
-        # --no-emit-project omits this package (not yet on PyPI) from the audit.
-        run: uv export --locked --no-dev --no-emit-project --format requirements.txt > /tmp/requirements.txt
-
-      - name: Run pip-audit
-        run: uvx pip-audit -r /tmp/requirements.txt
+      - name: Audit dependencies
+        # uv audit reads uv.lock and queries OSV. The command is still preview;
+        # the flag silences that warning. --locked fails when the lockfile is stale.
+        # Extras and dependency groups are included.
+        run: uv audit --locked --preview-features audit-command

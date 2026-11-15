@@ -3,7 +3,9 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
-  workflow_dispatch: # Enable manual trigger.
+  # Re-run from the release tag. A branch dispatch has no vX.Y.Z tag, so
+  # uv-dynamic-versioning emits a local version that PyPI rejects.
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
@@ -21,8 +23,11 @@ jobs:
       - name: Install uv (official Astral action)
         uses: astral-sh/setup-uv@v10.3.3
         with:
-          version: "0.13.7"
-          enable-cache: true
+          version: "0.13.8"
+          # Publish jobs stay off the Actions cache. setup-uv already skips
+          # caching for release events when this is "auto"; false also covers
+          # workflow_dispatch.
+          enable-cache: false
           python-version: "3.13"
 
       - name: Install all dependencies

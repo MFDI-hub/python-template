@@ -20,6 +20,8 @@ Repository = "https://github.com/MFDI-hub/python-template"
 dev = [
     # Template engine + rendering.
     "copier>=9.19.1",
+    # copyright_year's default in copier.yml uses jinja2_time.TimeExtension.
+    "jinja2-time>=0.2.0",
     # Lint/format/type-check this repo's own tooling and tests. The template
     # itself is checked after rendering, by the generated project's config.
     "ruff>=0.17.3",
@@ -55,7 +57,7 @@ select = [
     "UP",     # pyupgrade
     "ARG",    # flake8-unused-arguments
     "SIM",    # flake8-simplify
-    "TCH",    # flake8-type-checking
+    "TC",     # flake8-type-checking
     "PTH",    # flake8-use-pathlib
     "ERA",    # eradicate
     "PGH",    # pygrep-hooks (blanket noqa / blanket type: ignore)

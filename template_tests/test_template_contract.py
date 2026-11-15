@@ -59,9 +59,37 @@ def test_ci_matrix_matches_requires_python() -> None:
     assert versions[0] == minor, f"matrix starts at {versions[0]}, requires-python is >={minor}"
 
 
+def test_copyright_year_defaults_to_the_current_year() -> None:
+    text = _copier_yml()
+    assert "jinja2_time.TimeExtension" in text
+    assert "{% now 'utc', '%Y' %}" in text
+
+
+def test_copyright_year_tag_renders_a_year() -> None:
+    from jinja2 import Environment
+    from jinja2_time import TimeExtension
+
+    env = Environment(autoescape=True, extensions=[TimeExtension])
+    year = env.from_string("{% now 'utc', '%Y' %}").render()
+    assert len(year) == 4
+    assert year.isdigit()
+
+
+def test_workflows_pin_one_uv_version() -> None:
+    versions: set[str] = set()
+    workflows = list((ROOT / "template" / ".github" / "workflows").glob("*.yml"))
+    workflows.append(ROOT / ".github" / "workflows" / "ci.yml")
+    for workflow in workflows:
+        found = re.findall(r'version: "(\d+\.\d+\.\d+)"', workflow.read_text(encoding="utf-8"))
+        versions.update(found)
+    assert versions == {"0.13.8"}
+
+
 def test_setup_uv_is_pinned_to_a_full_version() -> None:
     # From v8 on, astral-sh/setup-uv only resolves full tags like @v10.3.3.
-    for workflow in (ROOT / "template" / ".github" / "workflows").glob("*.yml"):
+    workflows = list((ROOT / "template" / ".github" / "workflows").glob("*.yml"))
+    workflows.append(ROOT / ".github" / "workflows" / "ci.yml")
+    for workflow in workflows:
         text = workflow.read_text(encoding="utf-8")
         for ref in re.findall(r"astral-sh/setup-uv@(\S+)", text):
             assert re.fullmatch(r"v\d+\.\d+\.\d+", ref), (

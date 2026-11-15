@@ -7,8 +7,8 @@ and tools up to date, then verifying the changes end-to-end.
 There are two repos involved:
 
 - **Template repo** (`MFDI-hub/python-template`): The Copier template source. All version
-  changes start here. This repo does not have CI, so testing is done via a downstream
-  project.
+  changes start here. `.github/workflows/ci.yml` renders the template and runs lint and
+  tests on a generated project. Downstream projects still cover the full Python matrix.
 - **Downstream project(s)**: Projects created from the template (your libraries or apps on
   GitHub under `MFDI-hub` or elsewhere). These pull updates via `copier update` and have CI
   configured to run linting and tests across the Python version matrix.
@@ -57,7 +57,7 @@ uv run --with copier python repo_check.py
 
 # Then lint/test the intended output as a real project:
 uv run --with copier python repo_check.py --keep /tmp/tmpl
-cd /tmp/tmpl/dash-name && uv sync --all-extras
+cd /tmp/tmpl/dash-name && uv sync
 uv run python devtools/lint.py && uv run pytest -n auto --cov
 uv run mkdocs build --strict && uv build
 ```
@@ -86,7 +86,7 @@ The working tree must be clean before running `copier update`:
 git stash --include-untracked  # if needed
 
 # Pull template changes:
-uvx copier update --defaults --vcs-ref HEAD
+uvx --with jinja2-time copier update --defaults --trust --vcs-ref HEAD
 # Drop --vcs-ref HEAD once you want to follow only released template tags.
 
 # Restore stash if needed:
@@ -116,16 +116,16 @@ git commit -m "Update from MFDI-hub/python-template vX.Y.Z."
 git push origin main
 ```
 
-Then check that **CI passes on GitHub** — this runs the full lint and test suite across
-all Python versions in the matrix (e.g. 3.11, 3.12, 3.13, 3.14) on the stub test file
-and template code. This is the real end-to-end validation that the template works.
+Then check that **CI passes on GitHub** for this repo and for the downstream project.
+This repo's workflow renders the template once. Downstream CI runs the full lint and
+test suite across the Python matrix (3.11, 3.12, 3.13, 3.14, 3.15).
 
 If CI fails, fix issues in the template repo and repeat from Step 2.
 
 ## Step 7: Create a Release on the Template Repo
 
-Once CI passes downstream, create a GitHub release on the template repo. The template
-repo doesn't have its own CI, so the downstream CI run serves as the verification.
+Once CI passes here and downstream, create a GitHub release on the template repo.
+Downstream CI is still the check that covers every Python version in the matrix.
 
 ```shell
 # From the template repo:

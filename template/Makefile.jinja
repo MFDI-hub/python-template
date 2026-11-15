@@ -25,14 +25,14 @@ test-random:
 	uv run pytest
 	uv run pytest -p no:randomly
 
-# Dependency hygiene without running the linters. pip-audit runs from uvx so it
-# stays out of the dev group (CI does the same thing).
+# Dependency hygiene without the rest of the linters. uv audit reads uv.lock
+# (same command as CI). It is a preview command and needs uv 0.10.8 or newer.
 security:
 	uv run deptry .
-	uvx pip-audit --skip-editable
+	uv audit --locked --preview-features audit-command
 
 profile:
-	uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+	uv run --group profiling py-spy record -o profile.svg -- python -m {{ package_module }}
 
 docs:
 	uv run mkdocs serve
@@ -51,10 +51,10 @@ pre-commit:
 	uv run pre-commit run --all-files
 
 sync:
-	uv run sync-chosen-files
+	uv run python scripts/sync_chosen_files.py
 
 sync-once:
-	uv run sync-chosen-files --once
+	uv run python scripts/sync_chosen_files.py --once
 
 clean:
 	-rm -rf dist/

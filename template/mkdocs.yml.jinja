@@ -1,5 +1,8 @@
 site_name: "{{ package_name }}"
 site_description: "{{ package_description }}"
+# Canonical URL for the sitemap. docs.yml publishes a GitHub Pages project site.
+# For Read the Docs, use https://{{ package_name }}.readthedocs.io/ instead.
+site_url: https://{{ package_github_org }}.github.io/{{ package_name }}/
 
 repo_url: https://github.com/{{ package_github_org }}/{{ package_name }}
 repo_name: {{ package_github_org }}/{{ package_name }}
@@ -23,6 +26,8 @@ plugins:
       default_handler: python
       handlers:
         python:
+          # RTD never installs the project. This lets mkdocstrings import it from src/.
+          paths: [src]
           options:
             show_source: false
             show_root_heading: true

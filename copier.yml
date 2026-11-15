@@ -3,6 +3,10 @@
 
 _min_copier_version: "9.4.0"
 _subdirectory: template
+# copyright_year's default uses this extension. Install it beside Copier:
+#   uvx --with jinja2-time copier copy --trust ...
+_jinja_extensions:
+  - jinja2_time.TimeExtension
 # Generated projects start as a git repo with one "Initial template commit".
 _tasks:
   - "git init --quiet"
@@ -13,7 +17,7 @@ _message_after_copy: |
   Copied successfully! Next steps:
 
     cd PROJECT  # skip if you copied into `.`
-    uv sync --all-extras          # creates .venv and uv.lock
+    uv sync                       # creates .venv and uv.lock; commit uv.lock (CI uses --locked)
     uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
     uv run pytest -n auto --cov   # or: make install && make
 
@@ -67,5 +71,5 @@ package_github_org:
 
 copyright_year:
     type: str
-    help: Copyright year for the LICENSE?
-    default: "2026"
+    help: Copyright year for the LICENSE? (Press enter to use the current year.)
+    default: "{% now 'utc', '%Y' %}"

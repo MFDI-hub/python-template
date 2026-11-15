@@ -40,7 +40,7 @@ You can choose any compatible version required by this project.
 From your project root:
 
 ```shell
-uv sync --all-extras
+uv sync
 ```
 
 This creates `.venv` and installs runtime + development dependencies.

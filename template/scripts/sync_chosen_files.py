@@ -2,12 +2,12 @@
 """Watch source files and dump them to one text file.
 
 Usage:
-  uv run sync-chosen-files
-  uv run sync-chosen-files --once
-  uv run sync-chosen-files src/my_package
-  uv run sync-chosen-files --dir src/my_package --dir scripts
-  uv run sync-chosen-files --file-list scripts/chosen_files.txt
-  uv run sync-chosen-files --ext py,toml --once
+  uv run python scripts/sync_chosen_files.py
+  uv run python scripts/sync_chosen_files.py --once
+  uv run python scripts/sync_chosen_files.py src/my_package
+  uv run python scripts/sync_chosen_files.py --dir src/my_package --dir scripts
+  uv run python scripts/sync_chosen_files.py --file-list scripts/chosen_files.txt
+  uv run python scripts/sync_chosen_files.py --ext py,toml --once
 """
 
 from __future__ import annotations

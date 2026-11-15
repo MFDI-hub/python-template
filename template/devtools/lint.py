@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 
 from funlog import log_calls
@@ -16,15 +17,32 @@ reconfigure(emoji=not get_console().options.legacy_windows)  # No emojis on lega
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run codespell, ruff, ty, vulture, and deptry.")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Report problems only. Skip codespell and ruff rewrites (use this in CI).",
+    )
+    args = parser.parse_args()
+
     rprint()
 
+    spell = ["codespell", *SRC_PATHS, *DOC_PATHS, *OTHER_SPELL_PATHS]
+    ruff_check = ["ruff", "check", *SRC_PATHS]
+    ruff_format = ["ruff", "format", *SRC_PATHS]
+    if args.check:
+        ruff_format.insert(2, "--check")
+    else:
+        spell.insert(1, "--write-changes")
+        ruff_check.insert(2, "--fix")
+
     errcount = 0
-    errcount += run(["codespell", "--write-changes", *SRC_PATHS, *DOC_PATHS, *OTHER_SPELL_PATHS])
-    # Fix what can be fixed, then let the formatter and type checker work on
-    # the result; the last ruff pass reports anything left over.
-    errcount += run(["ruff", "check", "--fix", *SRC_PATHS])
-    errcount += run(["ruff", "format", *SRC_PATHS])
-    errcount += run(["ruff", "check", *SRC_PATHS])
+    errcount += run(spell)
+    errcount += run(ruff_check)
+    errcount += run(ruff_format)
+    # Local runs rewrite first. This second pass reports anything still left.
+    if not args.check:
+        errcount += run(["ruff", "check", *SRC_PATHS])
     # ty reads [tool.ty] in pyproject.toml, so it needs no paths to stay in sync
     # with the config (passing paths would silently include/exclude files).
     errcount += run(["ty", "check"])

@@ -2,9 +2,14 @@
   "name": "Python (uv)",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "features": {
-    "ghcr.io/astral-sh/uv-feature/uv:1": {}
+    // Community feature. Astral publishes ghcr.io/astral-sh/uv, and this
+    // feature installs that binary into the devcontainer base image.
+    // https://github.com/astral-sh/uv/issues/8737
+    "ghcr.io/va-h/devcontainers-features/uv:1": {
+      "version": "0.13.8"
+    }
   },
-  "postCreateCommand": "uv sync --all-extras && uv run pre-commit install && uv run pre-commit install --hook-type commit-msg",
+  "postCreateCommand": "uv sync && uv run pre-commit install && uv run pre-commit install --hook-type commit-msg",
   "customizations": {
     "vscode": {
       "extensions": [

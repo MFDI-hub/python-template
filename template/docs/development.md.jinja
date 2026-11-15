@@ -18,7 +18,7 @@ The `Makefile` simply offers shortcuts to `uv` commands for developer convenienc
 
 ```shell
 # First, install all dependencies, set up the venv, and install git hooks.
-# This runs `uv sync --all-extras` and `pre-commit install`.
+# This runs `uv sync` and `pre-commit install`.
 make install
 
 # Run uv sync, lint, and test:
@@ -27,10 +27,11 @@ make
 # Build wheel:
 make build
 
-# Linting (codespell, ruff, ty, vulture):
+# Linting (codespell, ruff, ty, vulture). Local runs may rewrite files.
+# CI passes --check so a dirty tree fails the job:
 make lint
-# or, without make:
 uv run python devtools/lint.py
+uv run python devtools/lint.py --check
 
 # Run tests (parallel + coverage):
 make test
@@ -110,14 +111,14 @@ Then:
 
 ```shell
 # One-shot dump:
-uv run sync-chosen-files --once
+uv run python scripts/sync_chosen_files.py --once
 
 # Watch and re-sync on changes:
-uv run sync-chosen-files
+uv run python scripts/sync_chosen_files.py
 
 # Custom paths or output file:
-uv run sync-chosen-files --dir src/{{ package_module }} --out outputs/builds/source_dump.txt --once
-uv run sync-chosen-files --file-list scripts/chosen_files.txt --ext py,toml --once
+uv run python scripts/sync_chosen_files.py --dir src/{{ package_module }} --out outputs/builds/source_dump.txt --once
+uv run python scripts/sync_chosen_files.py --file-list scripts/chosen_files.txt --ext py,toml --once
 ```
 
 Output defaults to `outputs/builds/source_dump.txt` (gitignored).
@@ -205,10 +206,9 @@ for item in tqdm(range(10)):
 Profiling tools are an opt-in group, so they never slow a normal setup:
 
 ```shell
-uv sync --group profiling
-uv run py-spy record -o profile.svg -- python -m {{ package_module }}
+uv run --group profiling py-spy record -o profile.svg -- python -m {{ package_module }}
 uv run python -m cProfile -o out.prof -m {{ package_module }}
-uv run snakeviz out.prof
+uv run --group profiling snakeviz out.prof
 ```
 
 ## Property-based tests
