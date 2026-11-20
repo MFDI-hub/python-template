@@ -1,6 +1,9 @@
 # Makefile for easy development workflows.
 # See docs/development.md for docs.
 # Note GitHub Actions call uv directly, not this Makefile.
+# Windows does not include GNU make. Install it (WSL or a port such as
+# Chocolatey) or run the uv commands in docs/development.md. Those commands
+# are what this file wraps.
 
 .DEFAULT_GOAL := default
 
@@ -13,6 +16,7 @@ install:
 	uv sync
 	uv run pre-commit install
 	uv run pre-commit install --hook-type commit-msg
+	uv run pre-commit install --hook-type pre-push
 
 lint:
 	uv run python devtools/lint.py
@@ -20,10 +24,13 @@ lint:
 test:
 	uv run pytest -n auto --cov --cov-report=term-missing
 
-# Two runs, to catch order dependence and flaky timing:
+# pytest-randomly already shuffles `make test`. This target prints the seed
+# (pytest header: `Using --randomly-seed=`; -vv is what makes that header show
+# under the -q in addopts) and then repeats with the plugin disabled, which is
+# the deterministic order. Replay a failure with `--randomly-seed=SEED`.
 test-random:
-	uv run pytest
-	uv run pytest -p no:randomly
+	uv run pytest -vv
+	uv run pytest -vv -p no:randomly
 
 # Dependency hygiene without the rest of the linters. uv audit reads uv.lock
 # (same command as CI). It is a preview command and needs uv 0.10.8 or newer.
@@ -45,10 +52,11 @@ upgrade:
 	uv sync
 
 build:
-	uv build
+	uv build --no-sources
 
 pre-commit:
 	uv run pre-commit run --all-files
+	uv run pre-commit run --all-files --hook-stage pre-push
 
 sync:
 	uv run python scripts/sync_chosen_files.py

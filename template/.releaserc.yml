@@ -2,6 +2,10 @@
 # Conventional Commits without rewriting pyproject.toml — version stays
 # driven by git tags via uv-dynamic-versioning.
 # https://semantic-release.gitbook.io/
+#
+# release.yml passes skip_npm_plugin, which replaces this plugin list at
+# runtime. Plugin versions are pinned on the action's extra_plugins input,
+# not here. package.json exists so semantic-release can discover this file.
 
 branches:
   - main

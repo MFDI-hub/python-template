@@ -40,7 +40,8 @@ Edit these as needed:
 
 - **Dev dependency pins** in `template/pyproject.toml.jinja` (`[dependency-groups]`)
 - **uv version** in `template/.github/workflows/*.yml` (the `version:` input of
-  `astral-sh/setup-uv`) and the **Actions versions** in the same files
+  `astral-sh/setup-uv`) and the **Actions SHAs** in the same files. Each `uses:`
+  line is a commit SHA with a `# vX.Y.Z` comment so Dependabot can bump it.
 - **Python version** in `requires-python`, classifiers, the CI matrix,
   `.python-version`, `[tool.ruff] target-version` and `[tool.ty.environment]`
 - **Pre-commit hook `rev:` values** in `template/.pre-commit-config.yaml`

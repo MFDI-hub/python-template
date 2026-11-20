@@ -12,13 +12,24 @@ workflow, tagged GitHub Releases publish the matching version to PyPI.
 
 You can release in either way:
 
-1. **Automatic (recommended):** push Conventional Commits to `main`/`master`. The
-   semantic-release workflow creates a GitHub Release + `vX.Y.Z` tag when commits warrant
-   a bump. That release triggers `publish.yml`.
-2. **Manual:** create a tagged release yourself in the GitHub UI or with `gh` (below).
+1. **Automatic (recommended):** push Conventional Commits to `main`/`master`.
+   `release.yml` runs semantic-release, which creates a GitHub Release and a
+   `vX.Y.Z` tag when commits warrant a bump. It then dispatches `publish.yml`
+   on that tag.
+2. **Manual:** create a tagged release yourself in the GitHub UI or with `gh`
+   (below). That `release: published` event starts `publish.yml`.
+
+Why the automatic path dispatches instead of waiting for the release event:
+GitHub does not start a new workflow from an event created with the default
+`GITHUB_TOKEN`. semantic-release uses that token, so the release it creates
+never triggers `publish.yml` on its own. `workflow_dispatch` is one of the two
+exceptions, which is why `release.yml` calls `gh workflow run`. Leave that job
+on `GITHUB_TOKEN`. A PAT or a GitHub App token would also fire the release
+event, and `publish.yml` would run twice.
 
 `publish.yml` can also be started with **Run workflow**. Start it from the release
-tag. A dispatch from a branch has no `vX.Y.Z` tag, so uv-dynamic-versioning produces
+tag (the workflow input defaults to PyPI; choose TestPyPI for a dry upload).
+A dispatch from a branch has no `vX.Y.Z` tag, so uv-dynamic-versioning produces
 a local version that PyPI rejects.
 
 ### First-Time Setup
@@ -45,13 +56,28 @@ for Copier usage and repo layout.
 
 3. **Authorize** your repository to publish to PyPI:
 
+   - In the GitHub repo, create an Environment named `pypi`
+     (**Settings → Environments → New environment**). Optional: add required
+     reviewers so a publish waits for approval. The name has to match the
+     `environment:` key in `publish.yml`.
+
    - Go to [the publishing settings page](https://pypi.org/manage/account/publishing/).
 
    - Find “Trusted Publisher Management” and register your GitHub repo as a new
      “pending” trusted publisher.
 
-   - Enter the project name, repo owner, repo name, and `publish.yml` as the workflow
-     name. (You can leave the “environment name” field blank.)
+   - Enter the project name, repo owner, repo name, workflow filename
+     `publish.yml`, and environment name `pypi`.
+
+     The workflow filename is `publish.yml`, including for automatic releases.
+     `release.yml` only dispatches it. PyPI does not accept a reusable workflow
+     as the trusted publisher, so the publish job stays in `publish.yml`.
+
+   - **TestPyPI (optional).** Repeat the trusted-publisher step on
+     [test.pypi.org](https://test.pypi.org/manage/account/publishing/) and create
+     a GitHub Environment named `testpypi`. Then use **Run workflow** on
+     `publish.yml` and choose `testpypi`. That run uploads to
+     `https://test.pypi.org/legacy/` and does not touch production PyPI.
 
 4. **Create a first release** so versioning starts on `0.x` (optional but recommended):
 
@@ -68,9 +94,23 @@ for Copier usage and repo layout.
 
 5. **Confirm it publishes to PyPI**
 
-   - Watch for the release workflow in the GitHub Actions tab.
+   - Watch `release.yml` and the `publish.yml` run it starts (or the run started
+     by a manual release) in the GitHub Actions tab.
 
    - If it succeeds, you should see it appear at `https://pypi.org/project/PROJECT`.
+
+### What the publish job checks
+
+`publish.yml` tests the tree, builds with `uv build --no-sources` (so the wheel
+does not depend on a local path), imports the package from that wheel, then
+uploads with `uv publish --trusted-publishing always`.
+
+`uv publish` uploads attestation files that are already next to the artifacts.
+It does not generate them. PyPI provenance therefore stays absent unless you add
+a generation step (for example `actions/attest-build-provenance`) or switch the
+upload to `pypa/gh-action-pypi-publish`, which can attest as it publishes. The
+trusted-publisher workflow filename would still be `publish.yml` if that step
+lives in this file.
 
 ### Publishing Subsequent Releases
 
@@ -116,7 +156,10 @@ Follow this checklist for each new release.
 #### Create the Release
 
 5. **Automatic:** merge Conventional Commits to `main` and let `release.yml` create the
-   GitHub Release.
+   GitHub Release and dispatch `publish.yml`. If the release exists but the
+   upload failed, re-run `publish.yml` from the tag. Re-running `release.yml`
+   does not publish again: semantic-release finds nothing new to release and
+   skips the dispatch.
 
 6. **Manual — create the release with `gh`:**
 

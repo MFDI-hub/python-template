@@ -99,7 +99,7 @@ python repo_check.py         # render the template + verify every generated file
 
 ### Security & deps
 
-- **Dependabot** — weekly updates for Actions and Python dependencies
+- **Dependabot** — weekly updates for Actions and the uv lockfile
 - **Trivy** — filesystem scan in CI
 - **uv audit** — vulnerability audit of `uv.lock` (`make security` and CI)
 - **deptry** — dependency hygiene on every lint run
@@ -108,7 +108,7 @@ python repo_check.py         # render the template + verify every generated file
 ### Release & docs hosting
 
 - **MkDocs** + **Material** + **mkdocstrings** — docs with API reference generated from docstrings
-- **semantic-release** — GitHub Releases from Conventional Commits
+- **semantic-release** — GitHub Releases from Conventional Commits; `release.yml` then dispatches `publish.yml` (a `GITHUB_TOKEN` release does not start that workflow on its own)
 - **Read the Docs** and **GitHub Pages** configs
 
 ### Extras and optional groups

@@ -44,8 +44,9 @@ dependencies = []
 
 [project.urls]
 Repository = "https://github.com/{{ package_github_org }}/{{ package_name }}"
+# docs.yml publishes a GitHub Pages project site at this URL.
+Documentation = "https://{{ package_github_org }}.github.io/{{ package_name }}/"
 # Homepage = "https://..."
-# Documentation = "https://..."
 
 [project.scripts]
 # Prefer the module name (snake_case); hyphens in a console script name can
@@ -75,7 +76,8 @@ dev = [
     "pytest-timeout>=2.4.0",
     "pytest-asyncio>=1.4.1",
     "pytest-mock>=3.17.0",
-    # Shuffles test order. `make test-random` runs once with it and once without.
+    # Shuffles test order on every pytest run. The seed is in the pytest header
+    # once verbosity is high enough to show it (`make test-random` uses -vv).
     "pytest-randomly>=5.1.0",
     # Git hooks, commits, releases.
     "pre-commit>=4.7.0",
@@ -109,6 +111,11 @@ profiling = [
 
 [tool.uv]
 default-groups = ["dev", "docs"]
+# The version is dynamic (git tags). uv's default cache key is pyproject.toml
+# only, so an editable install can keep reporting the pre-tag version.
+# Setting cache-keys replaces the default, so pyproject.toml stays in the list.
+# https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 # ---- Build system ----
 # hatchling builds the sdist and wheel. uv-dynamic-versioning reads the version
@@ -129,6 +136,9 @@ vcs = "git"
 style = "pep440"
 # Release commits/tags are created by semantic-release (.releaserc.yml).
 bump = false
+# Builds outside a git checkout (Dependabot's uv updater, some sandboxes)
+# raise RuntimeError without this. 0.0.0 is the plugin's documented fallback.
+fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/{{ package_module }}"]
@@ -235,12 +245,14 @@ skip = "*.lock,uv.lock,.git,dist,site,htmlcov,outputs"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-python_files = ["*.py"]
+# Default discovery. ["*.py"] would import helpers, fixtures, and data scripts
+# under tests/ and can collect the same module twice.
+python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 testpaths = ["tests"]
-# src/ layout: make the package importable without installing it first.
-pythonpath = ["src"]
+# No pythonpath. `uv sync` installs the project, so tests import the package a
+# user gets. pythonpath = ["src"] would let tests pass against a broken wheel.
 addopts = [
     "-ra",
     "-q",
@@ -303,6 +315,38 @@ exclude_lines = [
 [tool.deptry]
 # Directories scanned for imports.
 extend_exclude = ["devtools", "scripts", "docs"]
+
+# CLI tools, pytest plugins, and the docs/profiling extras are never imported.
+# devtools/ and scripts/ (where rich and funlog are imported) are excluded
+# above, so those two look unused as well. Without this list, `deptry .`
+# fails on a brand-new project.
+[tool.deptry.per_rule_ignores]
+DEP002 = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "pytest-sugar",
+    "pytest-timeout",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-randomly",
+    "pre-commit",
+    "commitizen",
+    "ruff",
+    "ty",
+    "codespell",
+    "vulture",
+    "deptry",
+    "rich",
+    "funlog",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mkdocstrings",
+    "hypothesis",
+    "py-spy",
+    "snakeviz",
+]
 
 [tool.deptry.package_module_name_map]
 # Mapping a package to its import name also silences "Assuming the corresponding

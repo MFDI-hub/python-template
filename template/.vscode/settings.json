@@ -15,7 +15,10 @@
       "source.organizeImports.ruff": "always"
     }
   },
-  // Type checking is done by ty (astral-sh.ty extension), which reads [tool.ty]
-  // from pyproject.toml. Pylance/Pyright is not used by this project.
+  // Type checking is done by ty (astral-sh.ty), which reads [tool.ty] from
+  // pyproject.toml. "None" turns Pylance off, so go-to-definition, completions,
+  // and hover come only from the ty extension. Install astral-sh.ty.
+  // To use Pylance for navigation instead, set this to "Pylance" and set
+  // "python.analysis.typeCheckingMode": "off" so ty remains the type checker.
   "python.languageServer": "None"
 }

@@ -1,5 +1,9 @@
 # {{ package_name }}
 
+[![CI](https://github.com/{{ package_github_org }}/{{ package_name }}/actions/workflows/ci.yml/badge.svg)](https://github.com/{{ package_github_org }}/{{ package_name }}/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/{{ package_name }})](https://pypi.org/project/{{ package_name }}/)
+[![Python versions](https://img.shields.io/pypi/pyversions/{{ package_name }})](https://pypi.org/project/{{ package_name }}/)
+
 > **This is the initial readme for your project from the
 > [python-template](https://github.com/MFDI-hub/python-template) Copier template.** Fill it in and
 > delete this message!
@@ -19,16 +23,16 @@ For instructions on publishing to PyPI, see [publishing.md](docs/publishing.md).
 ## Quickstart
 
 ```shell
-# Install project dependencies + git hooks:
+# Install project dependencies + git hooks (commit, commit-msg, pre-push):
 make install
-# or: uv sync && uv run pre-commit install
+# or: uv sync && uv run pre-commit install && uv run pre-commit install --hook-type commit-msg && uv run pre-commit install --hook-type pre-push
 
 # Run quality checks:
 uv run python devtools/lint.py
 uv run pytest -n auto --cov --cov-report=term-missing
 
 # Build package artifacts:
-uv build
+uv build --no-sources
 ```
 
 ## Lockfile (`uv.lock`)

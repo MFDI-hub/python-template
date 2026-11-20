@@ -8,17 +8,32 @@ _subdirectory: template
 _jinja_extensions:
   - jinja2_time.TimeExtension
 # Generated projects start as a git repo with one "Initial template commit".
+# These tasks must not run on `copier update`: `git add -A` would commit the
+# user's staged work, including conflict markers.
 _tasks:
-  - "git init --quiet"
-  - "git add -A"
-  - 'git commit --quiet -m "chore: initial commit from MFDI-hub/python-template" --no-verify'
+  - command: git init --quiet
+    when: "{{ _copier_operation == 'copy' }}"
+  - command: git add -A
+    when: "{{ _copier_operation == 'copy' }}"
+  - command: 'git commit --quiet -m "chore: initial commit from MFDI-hub/python-template" --no-verify'
+    when: "{{ _copier_operation == 'copy' }}"
+
+# Users rewrite these immediately. Updating them produces a conflict every time.
+_skip_if_exists:
+  - README.md
+  - LICENSE
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - CODE_OF_CONDUCT.md
+  - docs/index.md
+  - CHANGELOG.md
 
 _message_after_copy: |
   Copied successfully! Next steps:
 
     cd PROJECT  # skip if you copied into `.`
     uv sync                       # creates .venv and uv.lock; commit uv.lock (CI uses --locked)
-    uv run pre-commit install && uv run pre-commit install --hook-type commit-msg
+    uv run pre-commit install && uv run pre-commit install --hook-type commit-msg && uv run pre-commit install --hook-type pre-push
     uv run pytest -n auto --cov   # or: make install && make
 
   Before publishing, search for unfilled `changeme` strings and confirm the
@@ -31,15 +46,26 @@ _message_after_copy: |
     git branch -M main
     git push -u origin main
 
-  Releases: commit with Conventional Commits (`uv run cz commit`) and
-  semantic-release tags + publishes for you. See docs/publishing.md.
+  Releases: commit with Conventional Commits (`uv run cz commit`).
+  release.yml tags the repo and dispatches publish.yml. See docs/publishing.md.
+
+_message_after_update: |
+  Template updated. Resolve any conflict markers, then refresh the environment
+  and re-run checks:
+
+    uv sync
+    uv run pre-commit install && uv run pre-commit install --hook-type commit-msg && uv run pre-commit install --hook-type pre-push
+    uv run python devtools/lint.py --check
+    uv run pytest -n auto --cov
 
 # ---- Questions ----
 
 package_name:
     type: str
-    help: Package name? (GitHub repo + PyPI name, e.g. CamelCase, dash-case or snake_case. Only required field.)
+    help: Package name? (GitHub repo + PyPI name, e.g. CamelCase, dash-case or snake_case. "changeme" is rejected.)
     default: changeme
+    validator: >-
+        {% if package_name | lower == 'changeme' %}Choose a real package name. "changeme" is the prompt placeholder, not a PyPI project.{% endif %}
 
 package_module:
     type: str
@@ -61,13 +87,15 @@ package_author_name:
 
 package_author_email:
     type: str
-    help: Package author email? (Press enter to fill in later.)
-    default: changeme@example.com
+    help: Package author email? Required. This address is the vulnerability contact in SECURITY.md and the enforcement contact in CODE_OF_CONDUCT.md.
+    validator: "{% if not package_author_email or '@' not in package_author_email %}Enter a real email address. It is published as the security contact.{% elif package_author_email | lower == 'changeme@example.com' %}Replace the placeholder with a mailbox you actually read.{% endif %}"
 
 package_github_org:
     type: str
-    help: GitHub org or username that will host the repo? (Press enter to fill in later.)
+    help: GitHub org or username that will host the repo?
     default: changeme
+    validator: >-
+        {% if package_github_org | lower == 'changeme' %}Enter the GitHub org or username that will host the repo. "changeme" would publish dead URLs.{% endif %}
 
 copyright_year:
     type: str

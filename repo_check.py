@@ -53,6 +53,7 @@ class Answers:
     label: str
     package_name: str
     package_module: str
+    package_github_org: str = "demo-org"
 
 
 ANSWER_SETS = (
@@ -79,8 +80,40 @@ REQUIRED_FILES = (
     "docs/development.md",
     ".github/workflows/ci.yml",
     ".github/workflows/publish.yml",
+    ".github/workflows/release.yml",
+    ".github/dependabot.yml",
+    "CHANGELOG.md",
     ".vscode/settings.json",
     ".devcontainer/devcontainer.json",
+)
+
+# Dev, docs, and profiling tools that a generated project never imports.
+# deptry reports each of them as DEP002 unless they are ignored.
+_DEP002_REQUIRED = (
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "pytest-sugar",
+    "pytest-timeout",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-randomly",
+    "pre-commit",
+    "commitizen",
+    "ruff",
+    "ty",
+    "codespell",
+    "vulture",
+    "deptry",
+    "rich",
+    "funlog",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
+    "mkdocstrings",
+    "hypothesis",
+    "py-spy",
+    "snakeviz",
 )
 
 
@@ -168,7 +201,7 @@ def render(staged: Path, answers: Answers, dest: Path) -> None:
         "-d",
         "package_author_email=demo@example.com",
         "-d",
-        "package_github_org=demo-org",
+        f"package_github_org={answers.package_github_org}",
         "-d",
         "copyright_year=2026",
         str(staged),
@@ -217,7 +250,7 @@ def check_no_jinja_leftovers(dest: Path, _answers: Answers) -> None:
         raise CheckFailed(f"unrendered Jinja syntax in: {problems}")
 
 
-def check_pyproject(dest: Path, _answers: Answers) -> None:
+def check_pyproject(dest: Path, answers: Answers) -> None:
     """The generated pyproject.toml must be valid and carry the promised config."""
     data = tomllib.loads((dest / "pyproject.toml").read_text(encoding="utf-8"))
     project = data["project"]
@@ -260,8 +293,13 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
         raise CheckFailed(
             f"[tool.ty.environment] python-version must match requires-python, got {ty_python!r}"
         )
-    if data["tool"]["pytest"]["ini_options"]["testpaths"] != ["tests"]:
+    pytest_ini = data["tool"]["pytest"]["ini_options"]
+    if pytest_ini["testpaths"] != ["tests"]:
         raise CheckFailed("[tool.pytest.ini_options] testpaths must be ['tests']")
+    if pytest_ini.get("python_files") != ["test_*.py", "*_test.py"]:
+        raise CheckFailed("pytest python_files must be the default test-module globs")
+    if "pythonpath" in pytest_ini:
+        raise CheckFailed("drop pytest pythonpath; uv sync installs the project under test")
 
     for group in ("docs", "property-testing", "profiling"):
         if group not in groups:
@@ -269,16 +307,26 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
     if not any("mkdocstrings" in d for d in groups["docs"]):
         raise CheckFailed("docs group must include mkdocstrings")
 
-    defaults = data["tool"]["uv"].get("default-groups")
+    uv_tool = data["tool"]["uv"]
+    defaults = uv_tool.get("default-groups")
     if defaults != ["dev", "docs"]:
         # Without this, splitting docs out of dev silently stops `uv sync`
         # installing MkDocs, and every `uv run mkdocs ...` fails.
         raise CheckFailed(f"[tool.uv] default-groups should be ['dev', 'docs'], got {defaults!r}")
+    git_keys = [
+        item.get("git", {}) for item in uv_tool.get("cache-keys", []) if isinstance(item, dict)
+    ]
+    if not any(item.get("commit") and item.get("tags") for item in git_keys):
+        raise CheckFailed("[tool.uv] cache-keys must include git commit and tags")
     if "scripts" in data["tool"]["uv"]:
         raise CheckFailed("[tool.uv.scripts] is not a uv feature; invoke scripts directly")
 
     if "deptry" not in data["tool"]:
         raise CheckFailed("missing [tool.deptry] configuration")
+    ignored = data["tool"]["deptry"].get("per_rule_ignores", {}).get("DEP002", [])
+    missing_ignores = [name for name in _DEP002_REQUIRED if name not in ignored]
+    if missing_ignores:
+        raise CheckFailed(f"DEP002 ignore list is missing {missing_ignores}")
     if "S" not in ruff["lint"]["select"]:
         raise CheckFailed("ruff should select the S (bandit) security rules")
     if "TC" not in ruff["lint"]["select"]:
@@ -290,6 +338,13 @@ def check_pyproject(dest: Path, _answers: Answers) -> None:
 
     if not any("uv-dynamic-versioning" in req for req in data["build-system"]["requires"]):
         raise CheckFailed("build-system requires uv-dynamic-versioning")
+    if data["tool"]["uv-dynamic-versioning"].get("fallback-version") != "0.0.0":
+        raise CheckFailed('set [tool.uv-dynamic-versioning] fallback-version = "0.0.0"')
+
+    docs_url = project.get("urls", {}).get("Documentation", "")
+    expected_docs = f"https://{answers.package_github_org}.github.io/{answers.package_name}/"
+    if docs_url != expected_docs:
+        raise CheckFailed(f"Documentation URL should be {expected_docs}, got {docs_url!r}")
 
     _check_uv_accepts(dest)
 
@@ -331,15 +386,56 @@ def check_workflows(dest: Path, _answers: Answers) -> None:
     if '"3.15"' not in ci:
         raise CheckFailed("ci.yml matrix must include Python 3.15")
 
+    if "cancel-in-progress:" not in ci:
+        raise CheckFailed("ci.yml must cancel superseded runs")
+    if "timeout-minutes:" not in ci:
+        raise CheckFailed("ci.yml jobs need a timeout")
+    pinned = _unpinned_actions(dest)
+    if pinned:
+        raise CheckFailed(f"pin actions to a commit SHA: {pinned}")
+
     publish = (dest / ".github/workflows/publish.yml").read_text(encoding="utf-8")
     if "enable-cache: false" not in publish:
         raise CheckFailed("publish.yml must leave the uv cache disabled")
+    if "uv build --no-sources" not in publish:
+        raise CheckFailed("publish.yml must build with uv build --no-sources")
+    if "Smoke-test the wheel" not in publish:
+        raise CheckFailed("publish.yml must import the built wheel before publishing")
+    if "environment:" not in publish or "'pypi'" not in publish:
+        raise CheckFailed("publish.yml must publish through a pypi GitHub environment")
+
+    release = (dest / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    if "gh workflow run publish.yml" not in release:
+        raise CheckFailed(
+            "release.yml must dispatch publish.yml; a GITHUB_TOKEN release does not trigger it"
+        )
+    if "actions: write" not in release:
+        raise CheckFailed("release.yml needs actions: write to dispatch publish.yml")
+
+    dependabot = (dest / ".github/dependabot.yml").read_text(encoding="utf-8")
+    if 'package-ecosystem: "uv"' not in dependabot:
+        raise CheckFailed('dependabot must use package-ecosystem: "uv" so uv.lock updates')
+    if re.search(r'package-ecosystem:\s*"?pip"?', dependabot):
+        raise CheckFailed("dependabot pip ecosystem leaves uv.lock stale under --locked")
 
     makefile = (dest / "Makefile").read_text(encoding="utf-8")
     if "uv run sync-chosen-files" in makefile:
         raise CheckFailed("Makefile calls uv run sync-chosen-files; uv has no script table")
     if "python scripts/sync_chosen_files.py" not in makefile:
         raise CheckFailed("Makefile must invoke scripts/sync_chosen_files.py")
+    if "pre-commit install --hook-type pre-push" not in makefile:
+        raise CheckFailed("make install must register the pre-push hook")
+
+
+def _unpinned_actions(dest: Path) -> list[str]:
+    """Action refs that are still a mutable tag rather than a commit SHA."""
+    problems: list[str] = []
+    workflows = dest / ".github" / "workflows"
+    for path in sorted(workflows.glob("*.yml")):
+        for ref in re.findall(r"uses: [\w.-]+/[\w.-]+@(\S+)", path.read_text(encoding="utf-8")):
+            if not re.fullmatch(r"[0-9a-f]{40}", ref):
+                problems.append(f"{path.name}@{ref}")
+    return problems
 
 
 def strip_jsonc(text: str) -> str:

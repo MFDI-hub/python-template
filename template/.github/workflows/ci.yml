@@ -10,9 +10,16 @@ on:
     branches: ["main", "master"]
   pull_request:
     branches: ["main", "master"]
+  # Catch dependency drift even when nobody pushes.
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,24 +28,28 @@ jobs:
         # Update this as needed:
         # Common platforms: ["ubuntu-latest", "macos-latest", "windows-latest"]
         os: ["ubuntu-latest"]
-        # Floor matches requires-python in pyproject.toml (>=3.11).
+        # 3.11 is requires-python. 3.15.0 final shipped on 2026-10-09, so this
+        # cell is a stable interpreter. Do not add a prerelease (3.16) until
+        # `uv python install` resolves it without a preview flag: a red cell
+        # that never goes green trains people to ignore CI.
         python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     # Linux only by default. Use ${{ matrix.os }} for other OSes.
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
 
     steps:
       # Generally following uv docs:
       # https://docs.astral.sh/uv/guides/integration/github/
 
       - name: Checkout (official GitHub action)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Important for versioning plugins:
           fetch-depth: 0
 
       - name: Install uv (official Astral action)
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           # Pin a full version: from v8 on, major tags like "@v10" do not resolve.
           # Update this as needed.
@@ -49,7 +60,7 @@ jobs:
 
       # Alternately can use the official Python action:
       # - name: Set up Python (using actions/setup-python)
-      #   uses: actions/setup-python@v7
+      #   uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       #   with:
       #     python-version: ${{ matrix.python-version }}
 
@@ -59,6 +70,7 @@ jobs:
         run: uv sync --locked
 
       # --check reports only. Local `make lint` may still rewrite files.
+      # devtools/lint.py runs codespell, ruff, ty, vulture, and deptry.
       - name: Run linting
         run: uv run python devtools/lint.py --check
 
@@ -69,8 +81,18 @@ jobs:
           --cov-report=term-missing
           --cov-report=xml
 
+      - name: Write coverage summary
+        if: matrix.python-version == '3.13'
+        run: |
+          {
+            echo "## Coverage (Python 3.13)"
+            echo '```'
+            uv run coverage report
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-py${{ matrix.python-version }}
           path: coverage.xml
@@ -81,13 +103,13 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Trivy vulnerability scanner
-        # Pin to commit SHA (v0.36.0) — prefer SHA over mutable tags for Actions.
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -97,12 +119,13 @@ jobs:
 
   dependency-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.13.8"
           enable-cache: true

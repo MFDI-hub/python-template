@@ -34,18 +34,21 @@ repos:
         pass_filenames: false
         types: [python]
 
+      # pre-push, not every commit: both need a synced env and are slower than
+      # ruff. CI and `make lint` still run them. Install the hook with
+      # `pre-commit install --hook-type pre-push` (make install does this).
       - id: vulture
         name: vulture dead code
         entry: uv run vulture
         language: system
         pass_filenames: false
         types: [python]
+        stages: [pre-push]
 
-      # Runs on every commit but only fails when a *source* import changed the
-      # picture; it needs the env, hence language: system + uv run.
       - id: deptry
         name: deptry dependency check
         entry: uv run deptry .
         language: system
         pass_filenames: false
         types: [python]
+        stages: [pre-push]

@@ -7,19 +7,26 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.13.8"
           enable-cache: true
@@ -45,10 +52,17 @@ jobs:
           uv run python repo_check.py --keep "${RUNNER_TEMP}/tmpl"
           cd "${RUNNER_TEMP}/tmpl/dash-name"
           uv sync --all-extras
+          # lint.py runs codespell, ruff, ty, vulture, and deptry. The explicit
+          # deptry/vulture lines keep that contract visible if lint.py changes.
           uv run python devtools/lint.py --check
+          uv run deptry .
+          uv run vulture
           uv run pytest -n auto --cov
           uv run demo_pkg
           uv run python -m demo_pkg
           uv run mkdocs build --strict
           uv audit --locked --preview-features audit-command
-          uv build
+          uv build --no-sources
+          whl="$(echo dist/*.whl)"
+          test -f "${whl}"
+          uv run --with "${whl}" --no-project -- python -c "import demo_pkg"

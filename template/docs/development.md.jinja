@@ -15,6 +15,8 @@ Then
 
 The `Makefile` simply offers shortcuts to `uv` commands for developer convenience.
 (For clarity, GitHub Actions don’t use the Makefile and just call `uv` directly.)
+Windows does not include GNU make. Install it (WSL or a port such as Chocolatey)
+or run the `uv` commands below. They are what the Makefile wraps.
 
 ```shell
 # First, install all dependencies, set up the venv, and install git hooks.
@@ -24,7 +26,7 @@ make install
 # Run uv sync, lint, and test:
 make
 
-# Build wheel:
+# Build wheel (publishable; does not vendor path sources):
 make build
 
 # Linting (codespell, ruff, ty, vulture). Local runs may rewrite files.
@@ -33,8 +35,11 @@ make lint
 uv run python devtools/lint.py
 uv run python devtools/lint.py --check
 
-# Run tests (parallel + coverage):
+# Run tests (parallel + coverage). Order is shuffled; see test-random below.
 make test
+
+# Print the randomly seed, then repeat in a stable order:
+make test-random
 
 # Run all pre-commit hooks on the whole tree:
 make pre-commit
@@ -132,7 +137,8 @@ uv run pre-commit install
 uv run pre-commit install --hook-type commit-msg
 ```
 
-Hooks run ruff, codespell, ty, and vulture on commit. Commit messages should follow
+Commit hooks run ruff, codespell, and ty. vulture and deptry run on pre-push
+(`make install` registers that hook too) and in CI. Commit messages should follow
 [Conventional Commits](https://www.conventionalcommits.org/) (required for automated
 releases). Use Commitizen interactively:
 
@@ -152,6 +158,11 @@ extensions:
   for type checking and the ty language server. Note that this extension works with
   non-Microsoft VS Code forks like Cursor.
 - [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+
+`.vscode/settings.json` sets `python.languageServer` to `None`. Navigation and
+completions then come from the ty extension. Install it, or set the language
+server back to `Pylance` and set `python.analysis.typeCheckingMode` to `off`
+so ty remains the type checker.
 
 This repo also includes:
 

@@ -85,13 +85,100 @@ def test_workflows_pin_one_uv_version() -> None:
     assert versions == {"0.13.8"}
 
 
-def test_setup_uv_is_pinned_to_a_full_version() -> None:
-    # From v8 on, astral-sh/setup-uv only resolves full tags like @v10.3.3.
+def test_actions_are_pinned_to_a_commit_sha() -> None:
+    # A version comment on the same line is what Dependabot's github-actions
+    # ecosystem uses when it bumps a SHA pin.
     workflows = list((ROOT / "template" / ".github" / "workflows").glob("*.yml"))
     workflows.append(ROOT / ".github" / "workflows" / "ci.yml")
+    found = False
     for workflow in workflows:
         text = workflow.read_text(encoding="utf-8")
-        for ref in re.findall(r"astral-sh/setup-uv@(\S+)", text):
-            assert re.fullmatch(r"v\d+\.\d+\.\d+", ref), (
-                f"{workflow.name}: @{ref} is not a full version"
+        for line in text.splitlines():
+            match = re.search(r"uses: [\w.-]+/[\w.-]+@(\S+)", line)
+            if match is None:
+                continue
+            found = True
+            ref = match.group(1)
+            assert re.fullmatch(r"[0-9a-f]{40}", ref), f"{workflow.name}: @{ref} is not a SHA"
+            assert re.search(r"# v\d+\.\d+\.\d+\s*$", line), (
+                f"{workflow.name}: {line.strip()} needs a trailing version comment"
             )
+    assert found
+
+
+def test_precommit_revs_match_pyproject_floors() -> None:
+    pyproject = (ROOT / "template" / "pyproject.toml.jinja").read_text(encoding="utf-8")
+    hooks = (ROOT / "template" / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    for package, repo in (
+        ("ruff", "astral-sh/ruff-pre-commit"),
+        ("codespell", "codespell-project/codespell"),
+        ("commitizen", "commitizen-tools/commitizen"),
+    ):
+        floor = re.search(rf'"{package}>=([0-9.]+)"', pyproject)
+        assert floor is not None, package
+        block = hooks.split(f"https://github.com/{repo}", 1)[1].split("hooks:", 1)[0]
+        assert f"rev: v{floor.group(1)}" in block, (
+            f"{package} pre-commit rev drifted from >={floor.group(1)}"
+        )
+
+
+def test_python_version_file_is_in_the_ci_matrix() -> None:
+    pinned = (ROOT / "template" / ".python-version").read_text(encoding="utf-8").strip()
+    ci = (ROOT / "template" / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert f'"{pinned}"' in ci
+
+
+def _hook_body(text: str, hook_id: str, nxt: str | None) -> str:
+    start = text.index(f"- id: {hook_id}")
+    end = text.index(f"- id: {nxt}") if nxt else len(text)
+    return text[start:end]
+
+
+def test_slow_hooks_run_on_pre_push() -> None:
+    text = (ROOT / "template" / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    assert "stages: [pre-push]" in _hook_body(text, "vulture", "deptry")
+    assert "stages: [pre-push]" in _hook_body(text, "deptry", None)
+    assert "stages:" not in _hook_body(text, "ty", "vulture")
+
+
+def test_lint_script_runs_deptry_and_vulture() -> None:
+    text = (ROOT / "template" / "devtools" / "lint.py").read_text(encoding="utf-8")
+    assert '["deptry", "."]' in text
+    assert '["vulture"' in text or '["vulture",' in text
+
+
+def test_git_tasks_run_only_on_copy() -> None:
+    text = _copier_yml()
+    assert text.count("_copier_operation == 'copy'") >= 3
+    assert "_message_after_update:" in text
+    assert "uv sync" in text.split("_message_after_update:", 1)[1]
+    for name in (
+        "README.md",
+        "LICENSE",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "CODE_OF_CONDUCT.md",
+        "docs/index.md",
+        "CHANGELOG.md",
+    ):
+        assert re.search(rf"^\s*- {re.escape(name)}$", text, re.MULTILINE), name
+
+
+def test_placeholder_contacts_are_rejected() -> None:
+    text = _copier_yml()
+    email = re.search(
+        r"^package_author_email:\n(.*?)(?=^[a-z_]+:|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert email is not None
+    assert "default:" not in email.group(1)
+    assert "changeme@example.com" in email.group(1)
+    name = re.search(
+        r"^package_name:\n(.*?)(?=^[a-z_]+:|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert name is not None
+    assert "validator:" in name.group(1)
+    assert "changeme" in name.group(1)
