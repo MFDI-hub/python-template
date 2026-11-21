@@ -108,22 +108,25 @@ Run `uv run ty check --output-format concise` to see rule names for `[tool.ty.ru
 
 ## Sync chosen files
 
-`scripts/sync_chosen_files.py` watches selected source paths and writes a single text
-dump (useful for sharing code with LLMs or archiving a snapshot).
+[tool-shed](https://github.com/MFDI-hub/tool-shed) is installed with the dev group
+(PyPI project `tools-shed`). `sync_chosen_files` watches selected source paths and
+writes a single text dump (useful for sharing code with LLMs or archiving a snapshot).
+The same install provides the rest of the shed: `watch_run`, `skeleton_dump`,
+`hash_tree`, `repo_map`, `related`, `quiet_exec`, `slice`, `churn`, and `diff_syms`.
 
 Edit `scripts/chosen_files.txt` to list files or directories (one path per line).
 Then:
 
 ```shell
 # One-shot dump:
-uv run python scripts/sync_chosen_files.py --once
+uv run sync_chosen_files --once
 
 # Watch and re-sync on changes:
-uv run python scripts/sync_chosen_files.py
+uv run sync_chosen_files
 
 # Custom paths or output file:
-uv run python scripts/sync_chosen_files.py --dir src/{{ package_module }} --out outputs/builds/source_dump.txt --once
-uv run python scripts/sync_chosen_files.py --file-list scripts/chosen_files.txt --ext py,toml --once
+uv run sync_chosen_files --dir src/{{ package_module }} --out outputs/builds/source_dump.txt --once
+uv run sync_chosen_files --file-list scripts/chosen_files.txt --ext py,toml --once
 ```
 
 Output defaults to `outputs/builds/source_dump.txt` (gitignored).

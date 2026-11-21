@@ -58,11 +58,13 @@ pre-commit:
 	uv run pre-commit run --all-files
 	uv run pre-commit run --all-files --hook-stage pre-push
 
+# tools-shed (https://github.com/MFDI-hub/tool-shed). The dev group installs it.
+# With no paths, sync_chosen_files reads scripts/chosen_files.txt.
 sync:
-	uv run python scripts/sync_chosen_files.py
+	uv run sync_chosen_files
 
 sync-once:
-	uv run python scripts/sync_chosen_files.py --once
+	uv run sync_chosen_files --once
 
 clean:
 	-rm -rf dist/

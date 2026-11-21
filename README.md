@@ -80,6 +80,7 @@ python repo_check.py         # render the template + verify every generated file
 - **pytest** + **pytest-cov** + **pytest-xdist** — tests, coverage, parallelism
 - **MkDocs** + **Material for MkDocs** — docs
 - **Makefile** — `install`, `lint`, `test`, `docs`, `build`, `clean`, `upgrade`
+- **[tool-shed](https://github.com/MFDI-hub/tool-shed)** — dev-group CLI tools (`sync_chosen_files`, `watch_run`, and the rest), installed from PyPI as `tools-shed`
 - **GitHub Actions** — CI (lint, pytest matrix, docs, Trivy, uv audit) and PyPI publish (OIDC)
 
 

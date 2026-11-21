@@ -84,6 +84,9 @@ dev = [
     "commitizen>=4.19.3",
     "rich>=15.0.0",
     "funlog>=0.2.1",
+    # CLI tools from https://github.com/MFDI-hub/tool-shed. PyPI name is
+    # tools-shed; Warehouse rejects tool-shed.
+    "tools-shed>=0.2.1",
 ]
 
 # Documentation. Split out so `--no-group docs` keeps syncs small.
@@ -314,12 +317,12 @@ exclude_lines = [
 
 [tool.deptry]
 # Directories scanned for imports.
-extend_exclude = ["devtools", "scripts", "docs"]
+extend_exclude = ["devtools", "docs"]
 
 # CLI tools, pytest plugins, and the docs/profiling extras are never imported.
-# devtools/ and scripts/ (where rich and funlog are imported) are excluded
-# above, so those two look unused as well. Without this list, `deptry .`
-# fails on a brand-new project.
+# devtools/ (where rich and funlog are imported) is excluded above, so those
+# two look unused as well. tools-shed is only invoked as console scripts.
+# Without this list, `deptry .` fails on a brand-new project.
 [tool.deptry.per_rule_ignores]
 DEP002 = [
     "pytest",
@@ -346,6 +349,7 @@ DEP002 = [
     "hypothesis",
     "py-spy",
     "snakeviz",
+    "tools-shed",
 ]
 
 [tool.deptry.package_module_name_map]
@@ -357,6 +361,7 @@ uv-dynamic-versioning = "uv_dynamic_versioning"
 py-spy = "py_spy"
 hypothesis = "hypothesis"
 snakeviz = "snakeviz"
+tools-shed = "tools_shed"
 
 
 # ---- Commitizen (Conventional Commits helper) ----

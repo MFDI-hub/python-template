@@ -114,6 +114,7 @@ _DEP002_REQUIRED = (
     "hypothesis",
     "py-spy",
     "snakeviz",
+    "tools-shed",
 )
 
 
@@ -278,6 +279,7 @@ def check_pyproject(dest: Path, answers: Answers) -> None:
         "pytest-asyncio",
         "pytest-timeout",
         "pytest-randomly",
+        "tools-shed",
     ):
         if not any(d.startswith(tool) for d in dev):
             raise CheckFailed(f"dev dependency group is missing {tool}")
@@ -421,8 +423,10 @@ def check_workflows(dest: Path, _answers: Answers) -> None:
     makefile = (dest / "Makefile").read_text(encoding="utf-8")
     if "uv run sync-chosen-files" in makefile:
         raise CheckFailed("Makefile calls uv run sync-chosen-files; uv has no script table")
-    if "python scripts/sync_chosen_files.py" not in makefile:
-        raise CheckFailed("Makefile must invoke scripts/sync_chosen_files.py")
+    if "uv run sync_chosen_files" not in makefile:
+        raise CheckFailed("Makefile must invoke tools-shed via uv run sync_chosen_files")
+    if "python scripts/sync_chosen_files.py" in makefile:
+        raise CheckFailed("Makefile still calls the removed scripts/sync_chosen_files.py")
     if "pre-commit install --hook-type pre-push" not in makefile:
         raise CheckFailed("make install must register the pre-push hook")
 

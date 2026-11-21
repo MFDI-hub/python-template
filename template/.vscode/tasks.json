@@ -70,7 +70,7 @@
     {
       "label": "sync-chosen-files",
       "type": "shell",
-      "command": "uv run python scripts/sync_chosen_files.py --once",
+      "command": "uv run sync_chosen_files --once",
       "group": "build",
       "problemMatcher": []
     }
